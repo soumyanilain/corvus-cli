@@ -13,7 +13,7 @@ Each person owns one area end to end (code, comments, and their part of the repo
 | Member | Role | Owns |
 |---|---|---|
 | Soumyanil Ain | **Lead / Agent core** | Repo and main branch, agentic loop, provider abstraction (Ollama + Groq), integration of all parts, LLM comparison, final report assembly |
-| _Teammate 2_ | **MCP + Tools** | MCP client wrapper, `servers.json`, filesystem + Tavily servers, tool registry, confirmation gate, `run_command`, `grep_code` |
+| Sogol Maghzian | **MCP + Tools** | MCP client wrapper, `servers.json`, filesystem + Tavily servers, tool registry, confirmation gate, `run_command`, `grep_code` |
 | _Teammate 3_ | **RAG server** | Doc ingestion, chunking, embeddings, ChromaDB, reranking, FastMCP server, RAG evaluation (with vs without reranking) |
 | _Teammate 4_ | **CLI + Diagrams** | Rich REPL, streaming display, tool-call panels, slash commands, state + sequence diagrams, README setup section, video recording |
 

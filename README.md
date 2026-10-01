@@ -31,7 +31,7 @@ ITCS 5010 · Group Project 2: CLI Coding Assistant · Group __ <!-- fill in -->
 | Soumyanil Ain | Lead, agent core |
 | Sogol Maghzian | MCP client + tools |
 | _Teammate 3_ | RAG server |
-| _Teammate 4_ | CLI + diagrams |
+| Sumiran Juthuga | CLI + diagrams |
 
 ## Planned tech stack
 Python 3.11+, LangChain (`langchain-ollama`, `langchain-groq`), `mcp` Python SDK + `langchain-mcp-adapters`, ChromaDB, sentence-transformers, Rich, prompt_toolkit, Node.js 18+ (for the npx-based MCP servers).

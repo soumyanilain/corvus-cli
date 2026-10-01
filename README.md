@@ -29,7 +29,7 @@ ITCS 5010 · Group Project 2: CLI Coding Assistant · Group __ <!-- fill in -->
 | Name | Role |
 |---|---|
 | Soumyanil Ain | Lead, agent core |
-| _Teammate 2_ | MCP client + tools |
+| Sogol Maghzian | MCP client + tools |
 | _Teammate 3_ | RAG server |
 | _Teammate 4_ | CLI + diagrams |
 

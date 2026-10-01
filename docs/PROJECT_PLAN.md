@@ -3,7 +3,7 @@
 > Status: **planning draft, Oct 1 2026.** Written before implementation. We'll update the checkboxes as we go, but the plan itself stays as the record of what we intended.
 
 **Course:** ITCS 5010, Group Project 2 (CLI Coding Assistant)
-**Group:** Group \_\_ <!-- fill in -->
+**Group:** Group 6
 **Key dates:** Initial plan Oct 1 · Check-in Oct 8 · Final submission Oct 15 (11:59 pm)
 
 ## Team and roles

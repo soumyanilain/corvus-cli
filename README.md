@@ -6,15 +6,17 @@ Give Corvus a task in plain English. It reads your code, makes changes, runs com
 
 > **Project status: planning phase (Oct 1, 2026).** No implementation code yet. This commit contains our initial architecture and project plan. Setup instructions below are what we're planning and will be finalized as we build.
 
-ITCS 5010 · Group Project 2: CLI Coding Assistant · Group __ <!-- fill in -->
+ITCS 5010 · Group Project 2: CLI Coding Assistant · Group 6
 
 ## Planning documents
+
 - [Initial architecture (v1)](docs/ARCHITECTURE.md): components, diagram, design decisions, risks
 - [Project plan](docs/PROJECT_PLAN.md): roles, interfaces, week-by-week timeline, check-in goals
 
 ![Corvus v1 architecture](docs/diagrams/architecture-v1.png)
 
 ## What it will do
+
 - **Agentic loop:** reason → call tools → observe results → repeat, until the task is finished
 - **Two LLM backends:** local models through Ollama, cloud models through Groq, switchable at runtime
 - **Three MCP servers, loaded dynamically:**
@@ -26,14 +28,15 @@ ITCS 5010 · Group Project 2: CLI Coding Assistant · Group __ <!-- fill in -->
 
 ## Team
 
-| Name | Role |
-|---|---|
-| Soumyanil Ain | Lead, agent core |
-| Sogol Maghzian | MCP client + tools |
-| Meghana Thummalapally | RAG server |
-| Sumiran Juthuga | CLI + diagrams |
+| Name                  | Role               |
+| --------------------- | ------------------ |
+| Soumyanil Ain         | Lead, agent core   |
+| Sogol Maghzian        | MCP client + tools |
+| Meghana Thummalapally | RAG server         |
+| Sumiran Juthuga       | CLI + diagrams     |
 
 ## Planned tech stack
+
 Python 3.11+, LangChain (`langchain-ollama`, `langchain-groq`), `mcp` Python SDK + `langchain-mcp-adapters`, ChromaDB, sentence-transformers, Rich, prompt_toolkit, Node.js 18+ (for the npx-based MCP servers).
 
 ## Setup (planned, will be finalized)

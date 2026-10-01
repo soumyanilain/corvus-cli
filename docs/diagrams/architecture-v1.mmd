@@ -1,0 +1,49 @@
+flowchart TB
+    user([Developer in terminal])
+
+    subgraph app["Corvus CLI process (Python, asyncio)"]
+        cli["CLI / REPL<br/>Rich + prompt_toolkit<br/>streaming output, tool-call panels,<br/>/mode /model /tools commands"]
+        loop["Agentic Loop<br/>reason → act → observe → repeat<br/>stops when no tool calls or max steps"]
+        prov["Provider Layer<br/>one interface, many backends<br/>(LangChain chat models)"]
+        reg["Tool Registry + Confirmation Gate<br/>confirm mode: ask before write/run<br/>auto mode: execute directly"]
+        mcpc["MCP Client<br/>connects to every server in servers.json<br/>loads tools dynamically at startup"]
+        local["Local Tools<br/>run_command (shell)<br/>grep_code (content search)"]
+        cfg[("config.yaml + .env<br/>model, mode, API keys")]
+    end
+
+    subgraph llms["LLM backends"]
+        ollama["Ollama<br/>local model"]
+        groq["Groq<br/>cloud API"]
+    end
+
+    subgraph servers["MCP servers"]
+        fs["Filesystem server<br/>@modelcontextprotocol/server-filesystem<br/>read / write / edit / list / search files"]
+        tav["External server: Tavily<br/>web search + page extract"]
+        rag["Custom RAG server (FastMCP)<br/>search_docs(query, k)<br/>vector search → cross-encoder rerank"]
+    end
+
+    ws[("User's project folder<br/>(workspace)")]
+    web(("Web"))
+    chroma[("ChromaDB<br/>persistent vector store")]
+
+    subgraph ingest["One-time ingestion (python -m rag_server.ingest)"]
+        docs["FastAPI docs<br/>(Markdown)"] --> split["Split by headings<br/>+ chunk"] --> embed["Embed<br/>sentence-transformers"]
+    end
+
+    user <--> cli
+    cli <--> loop
+    cfg -.-> loop
+    loop <--> prov
+    prov --> ollama
+    prov --> groq
+    loop <--> reg
+    reg --> local
+    reg --> mcpc
+    mcpc -- "stdio" --> fs
+    mcpc -- "stdio / HTTP" --> tav
+    mcpc -- "stdio" --> rag
+    fs --> ws
+    local --> ws
+    tav --> web
+    rag --> chroma
+    embed --> chroma

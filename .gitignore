@@ -1,0 +1,26 @@
+# Secrets: real keys only ever live in .env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# RAG data: vector DB and downloaded docs are rebuilt by rag_server/ingest.py
+data/
+chroma/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs / session files
+*.log
+sessions/

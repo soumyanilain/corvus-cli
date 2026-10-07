@@ -1,0 +1,19 @@
+{
+    "mcpServers": {
+      "filesystem": {
+        "enabled": true,
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem",
+          "${WORKSPACE}"
+        ]
+      },
+      "tavily": {
+        "enabled": true,
+        "transport": "http",
+        "url": "https://mcp.tavily.com/mcp/?tavilyApiKey=${TAVILY_API_KEY}"
+      }
+    }
+  }

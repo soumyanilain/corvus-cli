@@ -1,0 +1,11 @@
+# MCP client (Sogol)
+mcp>=2.0.0
+python-dotenv>=1.0.0
+
+# LLM providers + agent loop
+langchain-core>=1.0
+langchain-groq>=1.0
+langchain-ollama>=1.0
+
+# Terminal UI
+rich>=13.0

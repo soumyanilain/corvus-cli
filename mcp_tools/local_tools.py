@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import signal
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +46,25 @@ def _resolve_inside_workspace(
     return requested_path
 
 
+def _kill_process_tree(pid: int) -> None:
+    """
+    Kill the shell AND everything it started. Killing only the
+    shell leaves children (e.g. a dev server) holding the output
+    pipe open, so the timeout never actually ends the wait.
+    """
+
+    try:
+        if sys.platform == "win32":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True,
+            )
+        else:
+            os.killpg(pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
 async def run_command(
     command: str,
     *,
@@ -67,6 +89,8 @@ async def run_command(
         cwd=str(cwd_path),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        # Own process group on Mac/Linux so we can kill the whole tree.
+        start_new_session=(sys.platform != "win32"),
     )
 
     try:
@@ -80,11 +104,17 @@ async def run_command(
         timed_out = False
 
     except asyncio.TimeoutError:
-        process.kill()
+        _kill_process_tree(process.pid)
 
-        stdout_bytes, stderr_bytes = (
-            await process.communicate()
-        )
+        try:
+            stdout_bytes, stderr_bytes = (
+                await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=5,
+                )
+            )
+        except asyncio.TimeoutError:
+            stdout_bytes, stderr_bytes = b"", b""
 
         timed_out = True
 
@@ -155,9 +185,14 @@ async def grep_code(
 
     files_scanned = 0
 
-    for current_root, dir_names, file_names in os.walk(
-        search_root
-    ):
+    # os.walk() yields nothing for a single file, so handle that case
+    # explicitly (otherwise grep on one file reports files_scanned: 0).
+    if search_root.is_file():
+        walker = [(str(search_root.parent), [], [search_root.name])]
+    else:
+        walker = os.walk(search_root)
+
+    for current_root, dir_names, file_names in walker:
 
         dir_names[:] = [
             name

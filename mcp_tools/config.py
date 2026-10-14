@@ -105,6 +105,14 @@ def load_server_config(
             "an 'mcpServers' object."
         )
 
+    # Drop disabled servers first, so a missing key for a
+    # disabled server (e.g. Tavily) doesn't block startup.
+    servers = {
+        name: cfg
+        for name, cfg in servers.items()
+        if cfg.get("enabled", True)
+    }
+
     expanded = _expand(
         servers,
         workspace,

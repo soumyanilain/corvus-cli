@@ -9,3 +9,6 @@ langchain-ollama>=1.0
 
 # Terminal UI
 rich>=13.0
+
+chromadb
+sentence-transformers

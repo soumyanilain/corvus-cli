@@ -49,7 +49,7 @@ def format_results(query: str, results: list[Result]) -> str:
 
     lines = [
         f"Top {len(results)} FastAPI documentation passages for: {query}",
-        f"(vector search over {config.CANDIDATES} candidates, reranked with a cross-encoder)",
+        f"(vector search over {config.CANDIDATES} candidates, ranked by {config.RETRIEVAL_METHOD})",
         "",
     ]
     for r in results:

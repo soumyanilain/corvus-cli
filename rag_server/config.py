@@ -36,6 +36,9 @@ MAX_INLINE_CODE_LINES = 60  # longer code examples are cut when inlined
 # Retrieval.
 CANDIDATES = 20        # vector search returns this many...
 TOP_K = 4              # ...and reranking keeps the best TOP_K
+# "vector", "rerank" or "fusion" (see retriever.py). Chosen from eval/rag_eval.py results.
+RETRIEVAL_METHOD = os.getenv("RAG_METHOD", "fusion")
+RRF_K = 60             # standard Reciprocal Rank Fusion constant
 MAX_CHARS_PER_RESULT = 1100  # keeps the tool's answer small enough for Groq's free tier
 
 DOCS_SITE = "https://fastapi.tiangolo.com"

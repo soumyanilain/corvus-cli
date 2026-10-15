@@ -1,0 +1,748 @@
+{
+  "summary": {
+    "questions": 25,
+    "k": 4,
+    "candidates": 20,
+    "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "rerank_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "rrf_k": 60,
+    "methods": {
+      "vector": {
+        "hit@1": 0.76,
+        "hit@4": 0.92,
+        "mrr": 0.83
+      },
+      "rerank": {
+        "hit@1": 0.8,
+        "hit@4": 0.88,
+        "mrr": 0.83
+      },
+      "fusion": {
+        "hit@1": 0.8,
+        "hit@4": 0.92,
+        "mrr": 0.85
+      }
+    },
+    "recall@20": 0.96,
+    "avg_latency_ms": {
+      "vector": 18.2,
+      "rerank": 835.0,
+      "fusion": 881.9
+    },
+    "vs_vector": {
+      "rerank": {
+        "improved": 3,
+        "worsened": 3
+      },
+      "fusion": {
+        "improved": 4,
+        "worsened": 3
+      }
+    }
+  },
+  "rows": [
+    {
+      "question": "How do I declare an optional query parameter that defaults to None?",
+      "expected": [
+        "tutorial/query-params.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 2,
+      "vector_top": [
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params.md",
+        "tutorial/query-params.md",
+        "tutorial/query-params-str-validations.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/query-params.md",
+        "tutorial/query-params.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/query-params.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params.md",
+        "tutorial/query-params-str-validations.md"
+      ]
+    },
+    {
+      "question": "How can I restrict a query string parameter to at most 50 characters?",
+      "expected": [
+        "tutorial/query-params-str-validations.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-param-models.md",
+        "tutorial/query-params-str-validations.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-param-models.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md",
+        "tutorial/query-params-str-validations.md"
+      ]
+    },
+    {
+      "question": "How do I make sure an integer in the URL path is greater than zero?",
+      "expected": [
+        "tutorial/path-params-numeric-validations.md"
+      ],
+      "in_top20": true,
+      "vector_rank": null,
+      "vector_top": [
+        "tutorial/query-params.md",
+        "tutorial/path-params.md",
+        "tutorial/path-params.md",
+        "tutorial/handling-errors.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/path-params-numeric-validations.md",
+        "tutorial/path-params-numeric-validations.md",
+        "tutorial/query-params.md",
+        "tutorial/first-steps.md"
+      ],
+      "fusion_rank": 4,
+      "fusion_top": [
+        "tutorial/query-params.md",
+        "tutorial/path-params.md",
+        "tutorial/path-params.md",
+        "tutorial/path-params-numeric-validations.md"
+      ]
+    },
+    {
+      "question": "How do I receive JSON in a POST request and validate it with a Pydantic model?",
+      "expected": [
+        "tutorial/body.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 4,
+      "vector_top": [
+        "advanced/json-base64-bytes.md",
+        "tutorial/body-fields.md",
+        "advanced/json-base64-bytes.md",
+        "tutorial/body.md"
+      ],
+      "rerank_rank": null,
+      "rerank_top": [
+        "advanced/json-base64-bytes.md",
+        "advanced/json-base64-bytes.md",
+        "advanced/path-operation-advanced-configuration.md",
+        "advanced/path-operation-advanced-configuration.md"
+      ],
+      "fusion_rank": null,
+      "fusion_top": [
+        "advanced/json-base64-bytes.md",
+        "advanced/json-base64-bytes.md",
+        "advanced/json-base64-bytes.md",
+        "advanced/path-operation-advanced-configuration.md"
+      ]
+    },
+    {
+      "question": "My React frontend on another port gets blocked by the browser when calling my API. How do I allow it?",
+      "expected": [
+        "tutorial/cors.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/cors.md",
+        "tutorial/cors.md",
+        "tutorial/cors.md",
+        "advanced/behind-a-proxy.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/cors.md",
+        "tutorial/frontend.md",
+        "advanced/strict-content-type.md",
+        "tutorial/security/first-steps.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/cors.md",
+        "tutorial/frontend.md",
+        "advanced/behind-a-proxy.md",
+        "advanced/strict-content-type.md"
+      ]
+    },
+    {
+      "question": "How do I return a 404 error when an item doesn't exist?",
+      "expected": [
+        "tutorial/handling-errors.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/frontend.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md",
+        "tutorial/handling-errors.md"
+      ]
+    },
+    {
+      "question": "How do I write automated tests for my endpoints with pytest?",
+      "expected": [
+        "tutorial/testing.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/testing.md",
+        "tutorial/testing.md",
+        "advanced/async-tests.md",
+        "advanced/async-tests.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/testing.md",
+        "tutorial/testing.md",
+        "tutorial/testing.md",
+        "advanced/async-tests.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/testing.md",
+        "tutorial/testing.md",
+        "tutorial/testing.md",
+        "tutorial/testing.md"
+      ]
+    },
+    {
+      "question": "How can users upload an image to my endpoint?",
+      "expected": [
+        "tutorial/request-files.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/request-files.md",
+        "tutorial/request-files.md",
+        "tutorial/request-forms-and-files.md",
+        "advanced/stream-data.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/request-files.md",
+        "tutorial/request-files.md",
+        "advanced/stream-data.md",
+        "tutorial/request-files.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/request-files.md",
+        "tutorial/request-files.md",
+        "tutorial/request-files.md",
+        "tutorial/request-files.md"
+      ]
+    },
+    {
+      "question": "Where do I put code that should run once when the app starts and once when it shuts down?",
+      "expected": [
+        "advanced/events.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 2,
+      "vector_top": [
+        "deployment/concepts.md",
+        "advanced/events.md",
+        "advanced/events.md",
+        "advanced/events.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "advanced/events.md",
+        "advanced/events.md",
+        "advanced/events.md",
+        "advanced/events.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "advanced/events.md",
+        "advanced/events.md",
+        "advanced/events.md",
+        "advanced/events.md"
+      ]
+    },
+    {
+      "question": "How do I send an email after returning the response, without making the client wait?",
+      "expected": [
+        "tutorial/background-tasks.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/background-tasks.md",
+        "tutorial/middleware.md",
+        "tutorial/handling-errors.md",
+        "advanced/websockets.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/background-tasks.md",
+        "tutorial/background-tasks.md",
+        "tutorial/middleware.md",
+        "tutorial/handling-errors.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/background-tasks.md",
+        "tutorial/middleware.md",
+        "tutorial/handling-errors.md",
+        "tutorial/server-sent-events.md"
+      ]
+    },
+    {
+      "question": "How do I reuse the same pagination parameters across many endpoints?",
+      "expected": [
+        "tutorial/dependencies/index.md",
+        "tutorial/dependencies/classes-as-dependencies.md"
+      ],
+      "in_top20": false,
+      "vector_rank": null,
+      "vector_top": [
+        "tutorial/body-multiple-params.md",
+        "tutorial/body-multiple-params.md",
+        "tutorial/query-param-models.md",
+        "tutorial/cookie-params.md"
+      ],
+      "rerank_rank": null,
+      "rerank_top": [
+        "tutorial/cookie-param-models.md",
+        "tutorial/query-param-models.md",
+        "tutorial/header-param-models.md",
+        "tutorial/bigger-applications.md"
+      ],
+      "fusion_rank": null,
+      "fusion_top": [
+        "tutorial/query-param-models.md",
+        "tutorial/body-multiple-params.md",
+        "tutorial/cookie-param-models.md",
+        "tutorial/query-params-str-validations.md"
+      ]
+    },
+    {
+      "question": "How do I issue and verify JWT access tokens for logged-in users?",
+      "expected": [
+        "tutorial/security/oauth2-jwt.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md",
+        "tutorial/security/oauth2-jwt.md"
+      ]
+    },
+    {
+      "question": "My main.py is getting huge. How do I split routes into several modules?",
+      "expected": [
+        "tutorial/bigger-applications.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md",
+        "tutorial/bigger-applications.md"
+      ]
+    },
+    {
+      "question": "How do I make a create endpoint respond with status 201 instead of 200?",
+      "expected": [
+        "tutorial/response-status-code.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/response-status-code.md",
+        "advanced/response-change-status-code.md",
+        "advanced/response-change-status-code.md",
+        "tutorial/response-status-code.md"
+      ],
+      "rerank_rank": 4,
+      "rerank_top": [
+        "advanced/response-change-status-code.md",
+        "advanced/additional-status-codes.md",
+        "advanced/response-change-status-code.md",
+        "tutorial/response-status-code.md"
+      ],
+      "fusion_rank": 2,
+      "fusion_top": [
+        "advanced/response-change-status-code.md",
+        "tutorial/response-status-code.md",
+        "advanced/additional-status-codes.md",
+        "tutorial/response-status-code.md"
+      ]
+    },
+    {
+      "question": "How do I make sure the user's password is never included in the API response?",
+      "expected": [
+        "tutorial/response-model.md",
+        "tutorial/extra-models.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/response-model.md",
+        "tutorial/security/first-steps.md",
+        "tutorial/security/first-steps.md",
+        "tutorial/security/simple-oauth2.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/response-model.md",
+        "tutorial/security/first-steps.md",
+        "tutorial/response-model.md",
+        "tutorial/security/first-steps.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/response-model.md",
+        "tutorial/security/first-steps.md",
+        "tutorial/security/first-steps.md",
+        "tutorial/response-model.md"
+      ]
+    },
+    {
+      "question": "How do I read the User-Agent sent by the client?",
+      "expected": [
+        "tutorial/header-params.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/header-params.md",
+        "tutorial/security/get-current-user.md",
+        "advanced/security/http-basic-auth.md",
+        "tutorial/server-sent-events.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/header-params.md",
+        "tutorial/header-params.md",
+        "tutorial/header-params.md",
+        "tutorial/security/get-current-user.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/header-params.md",
+        "tutorial/security/get-current-user.md",
+        "tutorial/header-params.md",
+        "tutorial/server-sent-events.md"
+      ]
+    },
+    {
+      "question": "How do I serve CSS and image files from a folder?",
+      "expected": [
+        "tutorial/static-files.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/static-files.md",
+        "how-to/custom-docs-ui-assets.md",
+        "how-to/custom-docs-ui-assets.md",
+        "how-to/custom-docs-ui-assets.md"
+      ],
+      "rerank_rank": null,
+      "rerank_top": [
+        "advanced/templates.md",
+        "how-to/custom-docs-ui-assets.md",
+        "how-to/custom-docs-ui-assets.md",
+        "how-to/custom-docs-ui-assets.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/static-files.md",
+        "how-to/custom-docs-ui-assets.md",
+        "advanced/templates.md",
+        "how-to/custom-docs-ui-assets.md"
+      ]
+    },
+    {
+      "question": "How do I keep a two-way real-time connection open with the browser for a chat app?",
+      "expected": [
+        "advanced/websockets.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md",
+        "advanced/websockets.md"
+      ]
+    },
+    {
+      "question": "How do I containerize my FastAPI app?",
+      "expected": [
+        "deployment/docker.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "deployment/docker.md",
+        "deployment/manually.md",
+        "deployment/docker.md",
+        "deployment/docker.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "deployment/docker.md",
+        "deployment/docker.md",
+        "deployment/docker.md",
+        "deployment/docker.md"
+      ],
+      "fusion_rank": 2,
+      "fusion_top": [
+        "deployment/manually.md",
+        "deployment/docker.md",
+        "deployment/docker.md",
+        "deployment/docker.md"
+      ]
+    },
+    {
+      "question": "How do I store and query data in a SQL database from my endpoints?",
+      "expected": [
+        "tutorial/sql-databases.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/extra-data-types.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md",
+        "tutorial/sql-databases.md"
+      ]
+    },
+    {
+      "question": "How do I measure how long each request takes and add it as a response header?",
+      "expected": [
+        "tutorial/middleware.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "tutorial/middleware.md",
+        "tutorial/middleware.md",
+        "how-to/custom-request-and-route.md",
+        "how-to/custom-request-and-route.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "tutorial/middleware.md",
+        "advanced/response-headers.md",
+        "advanced/opentelemetry.md",
+        "how-to/custom-request-and-route.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/middleware.md",
+        "tutorial/middleware.md",
+        "advanced/response-headers.md",
+        "how-to/custom-request-and-route.md"
+      ]
+    },
+    {
+      "question": "How do I accept username and password sent as an HTML form instead of JSON?",
+      "expected": [
+        "tutorial/request-forms.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 2,
+      "vector_top": [
+        "advanced/security/http-basic-auth.md",
+        "tutorial/request-forms.md",
+        "tutorial/request-forms.md",
+        "tutorial/request-forms.md"
+      ],
+      "rerank_rank": 2,
+      "rerank_top": [
+        "tutorial/request-files.md",
+        "tutorial/request-forms.md",
+        "tutorial/request-forms.md",
+        "tutorial/security/simple-oauth2.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "tutorial/request-forms.md",
+        "tutorial/request-forms.md",
+        "tutorial/security/oauth2-jwt.md",
+        "advanced/security/http-basic-auth.md"
+      ]
+    },
+    {
+      "question": "Should my path operation functions be async def or normal def?",
+      "expected": [
+        "async.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "async.md",
+        "tutorial/dependencies/index.md",
+        "async.md",
+        "async.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "async.md",
+        "tutorial/dependencies/index.md",
+        "async.md",
+        "async.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "async.md",
+        "tutorial/dependencies/index.md",
+        "async.md",
+        "async.md"
+      ]
+    },
+    {
+      "question": "In tests, how do I replace a database dependency with a fake one?",
+      "expected": [
+        "advanced/testing-dependencies.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md",
+        "how-to/testing-database.md",
+        "tutorial/dependencies/index.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md",
+        "advanced/testing-dependencies.md"
+      ]
+    },
+    {
+      "question": "How do I load configuration like API keys from environment variables?",
+      "expected": [
+        "advanced/settings.md",
+        "environment-variables.md"
+      ],
+      "in_top20": true,
+      "vector_rank": 1,
+      "vector_top": [
+        "environment-variables.md",
+        "advanced/settings.md",
+        "advanced/settings.md",
+        "advanced/settings.md"
+      ],
+      "rerank_rank": 1,
+      "rerank_top": [
+        "environment-variables.md",
+        "advanced/settings.md",
+        "advanced/settings.md",
+        "advanced/settings.md"
+      ],
+      "fusion_rank": 1,
+      "fusion_top": [
+        "environment-variables.md",
+        "advanced/settings.md",
+        "advanced/settings.md",
+        "advanced/settings.md"
+      ]
+    }
+  ]
+}

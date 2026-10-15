@@ -5,10 +5,18 @@ Retrieval with reranking (advanced RAG technique: NirDiamant RAG_Techniques #17)
        Embedding search is fast but rough: it finds text that *looks* similar.
     2. Score every candidate with a cross-encoder, which reads the question and
        the chunk *together* and judges how well the chunk answers it.
-    3. Keep the TOP_K best by cross-encoder score.
+    3. Pick the TOP_K to return. Three methods, compared in eval/rag_eval.py:
 
-rerank=False skips step 2 and returns the top results by vector similarity,
-which is the baseline we compare against in eval/rag_eval.py.
+       "vector"  skip step 2; order by vector similarity (the baseline)
+       "rerank"  order by cross-encoder score alone
+       "fusion"  combine both rankings with Reciprocal Rank Fusion (RRF):
+                 score = 1/(60 + vector rank) + 1/(60 + cross-encoder rank)
+
+Our evaluation showed the cross-encoder (trained on web search, MS MARCO) fixes
+some of vector search's mistakes but over-weights literal word matches: for
+"receive JSON ... validate with Pydantic" it prefers a page about JSON/Base64
+over the request-body tutorial. Fusion keeps a chunk near the top only if both
+methods agree it's relevant, so neither one's mistakes win on their own.
 """
 
 from __future__ import annotations
@@ -88,9 +96,13 @@ class DocsRetriever:
         self,
         query: str,
         k: int = config.TOP_K,
-        rerank: bool = True,
+        method: str = config.RETRIEVAL_METHOD,
         candidates: int = config.CANDIDATES,
     ) -> list[Result]:
+        """Return the k best chunks using "vector", "rerank" or "fusion" (see module docstring)."""
+
+        if method not in ("vector", "rerank", "fusion"):
+            raise ValueError(f"unknown retrieval method: {method}")
         self.warm_up()
 
         query_vector = self._embed([query])[0]
@@ -106,10 +118,19 @@ class DocsRetriever:
 
         order = list(range(len(docs)))  # already sorted by vector similarity
         rerank_scores: list[float | None] = [None] * len(docs)
-        if rerank and docs:
+        if method != "vector" and docs:
             scores = self._rerank(query, docs)
             rerank_scores = list(scores)
-            order.sort(key=lambda i: scores[i], reverse=True)
+            by_rerank = sorted(order, key=lambda i: scores[i], reverse=True)
+            if method == "rerank":
+                order = by_rerank
+            else:  # fusion: Reciprocal Rank Fusion of the two rankings
+                rerank_pos = {i: pos for pos, i in enumerate(by_rerank)}
+                rrf = {
+                    i: 1 / (config.RRF_K + i + 1) + 1 / (config.RRF_K + rerank_pos[i] + 1)
+                    for i in order
+                }
+                order = sorted(order, key=lambda i: rrf[i], reverse=True)
 
         results = []
         for rank, i in enumerate(order[:k], start=1):

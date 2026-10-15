@@ -1,18 +1,19 @@
 """
-Evaluate the advanced RAG technique: vector search alone vs. vector search + reranking.
+Evaluate the advanced RAG technique: vector search alone vs. reranking vs. rank fusion.
 
     python -m eval.rag_eval
 
 For each question in eval/rag_questions.json we know which docs page(s) answer it.
-We run the same retriever twice:
-  - baseline: top 4 chunks by vector (cosine) similarity
-  - reranked: top 20 by vector similarity, re-scored by the cross-encoder, keep top 4
+We run the same retriever three ways (see rag_server/retriever.py):
+  - vector: top 4 chunks by vector (cosine) similarity              (baseline)
+  - rerank: top 20 by vector similarity, re-ordered by the cross-encoder, keep 4
+  - fusion: top 20, ordered by Reciprocal Rank Fusion of both rankings, keep 4
 and measure:
-  - Hit@1: the first result comes from a correct page
-  - Hit@4: at least one of the 4 results comes from a correct page
-  - MRR:   1 / (rank of the first correct result), 0 if none; averaged
+  - Hit@1:     the first result comes from a correct page
+  - Hit@4:     at least one of the 4 results comes from a correct page
+  - MRR:       1 / (rank of the first correct result), 0 if none; averaged
   - Recall@20: a correct page is somewhere in the 20 candidates
-              (reranking can't find what vector search didn't fetch)
+               (no re-ordering can find what vector search didn't fetch)
 
 Results are written to eval/results/rag_eval.json and eval/results/rag_eval.md.
 """
@@ -31,6 +32,8 @@ from rag_server.retriever import DocsRetriever
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 K = config.TOP_K
+METHODS = ["vector", "rerank", "fusion"]
+LABELS = {"vector": "Vector search only", "rerank": "+ Cross-encoder rerank", "fusion": "+ Rerank with rank fusion"}
 
 
 def first_hit_rank(sources: list[str], expected: list[str]) -> int | None:
@@ -55,42 +58,41 @@ def main(retriever: DocsRetriever | None = None) -> dict:
         sys.exit("Index not built. Run: python -m rag_server.ingest")
 
     questions = json.loads((HERE / "rag_questions.json").read_text(encoding="utf-8"))
-    print(f"Loading models and running {len(questions)} questions...")
+    print(f"Loading models and running {len(questions)} questions x {len(METHODS)} methods...")
     retriever.warm_up()
 
+    ranks = {m: [] for m in METHODS}
+    times = {m: [] for m in METHODS}
+    recall20 = []
     rows = []
-    base_ranks, rr_ranks, recall20 = [], [], []
-    base_times, rr_times = [], []
     for q in questions:
-        t = time.perf_counter()
-        base = retriever.search(q["question"], k=config.CANDIDATES, rerank=False)
-        base_times.append(time.perf_counter() - t)
+        tops = {}
+        for m in METHODS:
+            t = time.perf_counter()
+            # For "vector" fetch all 20 so we can also measure Recall@20.
+            found = retriever.search(q["question"], k=config.CANDIDATES if m == "vector" else K, method=m)
+            times[m].append(time.perf_counter() - t)
+            tops[m] = [r.source for r in found]
 
-        t = time.perf_counter()
-        reranked = retriever.search(q["question"], k=K, rerank=True)
-        rr_times.append(time.perf_counter() - t)
-
-        candidates = [r.source for r in base]           # all 20, in vector order
-        b_rank = first_hit_rank(candidates[:K], q["expected"])
-        r_rank = first_hit_rank([r.source for r in reranked], q["expected"])
-        in20 = first_hit_rank(candidates, q["expected"]) is not None
-
-        base_ranks.append(b_rank)
-        rr_ranks.append(r_rank)
+        in20 = first_hit_rank(tops["vector"], q["expected"]) is not None
+        tops["vector"] = tops["vector"][:K]
+        row = {"question": q["question"], "expected": q["expected"], "in_top20": in20}
+        for m in METHODS:
+            rank = first_hit_rank(tops[m], q["expected"])
+            ranks[m].append(rank)
+            row[f"{m}_rank"] = rank
+            row[f"{m}_top"] = tops[m]
         recall20.append(in20)
-        rows.append(
-            {
-                "question": q["question"],
-                "expected": q["expected"],
-                "baseline_rank": b_rank,
-                "reranked_rank": r_rank,
-                "in_top20": in20,
-                "baseline_top": candidates[:K],
-                "reranked_top": [r.source for r in reranked],
-            }
-        )
-        mark = lambda r: str(r) if r else "-"
-        print(f"  base {mark(b_rank):>2} | rerank {mark(r_rank):>2} | {q['question'][:70]}")
+        rows.append(row)
+        show = " | ".join(f"{m} {row[f'{m}_rank'] or '-':>2}" for m in METHODS)
+        print(f"  {show} | {q['question'][:62]}")
+
+    def changed(m: str, better: bool) -> int:
+        out = 0
+        for b, r in zip(ranks["vector"], ranks[m]):
+            b, r = b or 99, r or 99
+            out += (r < b) if better else (r > b)
+        return out
 
     summary = {
         "questions": len(questions),
@@ -98,15 +100,11 @@ def main(retriever: DocsRetriever | None = None) -> dict:
         "candidates": config.CANDIDATES,
         "embed_model": config.EMBED_MODEL,
         "rerank_model": config.RERANK_MODEL,
-        "baseline": summarize(base_ranks, K),
-        "reranked": summarize(rr_ranks, K),
+        "rrf_k": config.RRF_K,
+        "methods": {m: summarize(ranks[m], K) for m in METHODS},
         "recall@20": round(sum(recall20) / len(recall20), 3),
-        "avg_latency_ms": {
-            "baseline": round(statistics.mean(base_times) * 1000, 1),
-            "reranked": round(statistics.mean(rr_times) * 1000, 1),
-        },
-        "improved": sum(1 for b, r in zip(base_ranks, rr_ranks) if (r or 99) < (b or 99)),
-        "worsened": sum(1 for b, r in zip(base_ranks, rr_ranks) if (r or 99) > (b or 99)),
+        "avg_latency_ms": {m: round(statistics.mean(times[m]) * 1000, 1) for m in METHODS},
+        "vs_vector": {m: {"improved": changed(m, True), "worsened": changed(m, False)} for m in METHODS[1:]},
     }
 
     RESULTS.mkdir(exist_ok=True)
@@ -114,39 +112,38 @@ def main(retriever: DocsRetriever | None = None) -> dict:
         json.dumps({"summary": summary, "rows": rows}, indent=2), encoding="utf-8"
     )
 
-    b, r = summary["baseline"], summary["reranked"]
+    s = summary["methods"]
     md = [
-        "# RAG evaluation: vector search vs. vector search + reranking",
+        "# RAG evaluation: vector search vs. reranking vs. rank fusion",
         "",
-        f"{len(questions)} questions, top {K} results, reranking over {config.CANDIDATES} candidates.",
-        f"Embedding model: `{config.EMBED_MODEL}`. Reranker: `{config.RERANK_MODEL}`.",
+        f"{len(questions)} questions, top {K} results, re-ordering {config.CANDIDATES} candidates.",
+        f"Embedding model: `{config.EMBED_MODEL}`. Reranker: `{config.RERANK_MODEL}`. RRF k = {config.RRF_K}.",
         "",
-        f"| Metric | Vector search only | + Cross-encoder reranking |",
-        f"|---|---|---|",
-        f"| Hit@1 | {b['hit@1']:.0%} | {r['hit@1']:.0%} |",
-        f"| Hit@{K} | {b[f'hit@{K}']:.0%} | {r[f'hit@{K}']:.0%} |",
-        f"| MRR | {b['mrr']:.3f} | {r['mrr']:.3f} |",
-        f"| Avg latency | {summary['avg_latency_ms']['baseline']} ms | {summary['avg_latency_ms']['reranked']} ms |",
+        "| Metric | " + " | ".join(LABELS[m] for m in METHODS) + " |",
+        "|---|" + "---|" * len(METHODS),
+        "| Hit@1 | " + " | ".join(f"{s[m]['hit@1']:.0%}" for m in METHODS) + " |",
+        f"| Hit@{K} | " + " | ".join(f"{s[m][f'hit@{K}']:.0%}" for m in METHODS) + " |",
+        "| MRR | " + " | ".join(f"{s[m]['mrr']:.3f}" for m in METHODS) + " |",
+        "| Avg latency | " + " | ".join(f"{summary['avg_latency_ms'][m]:.0f} ms" for m in METHODS) + " |",
         "",
         f"Recall@{config.CANDIDATES} (correct page anywhere in the candidates): {summary['recall@20']:.0%}",
-        f"Reranking moved the first correct result up for {summary['improved']} questions "
-        f"and down for {summary['worsened']}.",
         "",
-        "| Question | Vector rank | Reranked rank |",
-        "|---|---|---|",
+        "| Question | Vector | Rerank | Fusion |",
+        "|---|---|---|---|",
     ]
     for row in rows:
-        md.append(
-            f"| {row['question']} | {row['baseline_rank'] or '-'} | {row['reranked_rank'] or '-'} |"
-        )
+        md.append(f"| {row['question']} | " + " | ".join(str(row[f'{m}_rank'] or '-') for m in METHODS) + " |")
     (RESULTS / "rag_eval.md").write_text("\n".join(md) + "\n", encoding="utf-8")
 
     print()
-    print(f"              Hit@1   Hit@{K}   MRR")
-    print(f"  baseline    {b['hit@1']:.0%}    {b[f'hit@{K}']:.0%}    {b['mrr']:.3f}")
-    print(f"  reranked    {r['hit@1']:.0%}    {r[f'hit@{K}']:.0%}    {r['mrr']:.3f}")
-    print(f"  recall@{config.CANDIDATES}: {summary['recall@20']:.0%}   "
-          f"improved {summary['improved']}, worsened {summary['worsened']}")
+    print(f"              Hit@1   Hit@{K}   MRR     latency")
+    for m in METHODS:
+        print(f"  {m:<10}  {s[m]['hit@1']:>5.0%}  {s[m][f'hit@{K}']:>5.0%}   {s[m]['mrr']:.3f}  "
+              f"{summary['avg_latency_ms'][m]:>6.0f} ms")
+    print(f"  recall@{config.CANDIDATES}: {summary['recall@20']:.0%}")
+    for m in METHODS[1:]:
+        v = summary["vs_vector"][m]
+        print(f"  {m} vs vector: improved {v['improved']}, worsened {v['worsened']}")
     print(f"\nSaved to {RESULTS / 'rag_eval.md'}")
     return summary
 

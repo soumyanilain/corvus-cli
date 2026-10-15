@@ -2,8 +2,10 @@
 Compare LLMs on the same coding task, with no human in the loop.
 
     python -m eval.llm_compare
-    python -m eval.llm_compare --models groq:openai/gpt-oss-120b groq:llama-3.3-70b-versatile
-    python -m eval.llm_compare --models ollama:llama3.1:8b
+    python -m eval.llm_compare --models groq:openai/gpt-oss-20b ollama:llama3.1:8b
+
+Each model's run is saved in eval/results/runs/, and the summary table covers
+every saved run, so models can be run in separate invocations.
 
 For each model:
   1. Copy eval/sample_project (a small FastAPI app with a bug) to a fresh folder.
@@ -41,7 +43,7 @@ HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 RUNS_DIR = PROJECT_ROOT / "data" / "llm_runs"
 
-DEFAULT_MODELS = ["groq:openai/gpt-oss-120b", "groq:llama-3.3-70b-versatile"]
+DEFAULT_MODELS = ["groq:openai/gpt-oss-120b", "groq:openai/gpt-oss-20b", "groq:qwen/qwen3.8-27b"]
 
 TASK = """This folder is a small FastAPI app (app.py) with tests in test_app.py. Make these changes:
 1. Add a POST /books endpoint that accepts a JSON body validated with a Pydantic model:
@@ -60,6 +62,7 @@ class RecordingEvents:
         self.model_calls = 0
         self.tool_calls: list[dict[str, Any]] = []
         self.errors: list[str] = []
+        self.notices: list[str] = []
         self._pending: dict[str, Any] | None = None
 
     def on_thinking(self) -> None:
@@ -77,6 +80,10 @@ class RecordingEvents:
         call.update(ok=ok, seconds=round(time.time() - call.pop("started"), 2), result=preview[:300])
         self.tool_calls.append(call)
         self._pending = None
+
+    def on_notice(self, message: str) -> None:
+        self.notices.append(message)
+        print(f"  [{self.label}] note: {message}", flush=True)
 
     def on_error(self, message: str) -> None:
         self.errors.append(message[:500])
@@ -159,6 +166,7 @@ async def run_one(spec: str, settings: Settings, servers: Path) -> dict[str, Any
         "tools_used": dict(Counter(c["tool"].split("__")[-1] for c in events.tool_calls)),
         "hit_step_limit": hit_step_limit,
         "errors": events.errors,
+        "recoveries": events.notices,
         "tokens": tokens,
         "agent_tests": agent_tests,
         "grading": grading,
@@ -173,6 +181,20 @@ async def run_one(spec: str, settings: Settings, servers: Path) -> dict[str, Any
     )
     print(f"  -> grading {result['grading_score']}, {result['tool_calls']} tool calls, {seconds}s")
     return result
+
+
+def all_runs() -> list[dict[str, Any]]:
+    """Every saved run (one per model), so separate invocations add up to one table."""
+
+    results = []
+    for path in sorted((RESULTS / "runs").glob("*.json")):
+        run = json.loads(path.read_text(encoding="utf-8"))
+        run.pop("steps", None)
+        # A model the API key can't use isn't part of the comparison.
+        if any("model_not_found" in e for e in run.get("errors", [])):
+            continue
+        results.append(run)
+    return results
 
 
 def write_report(results: list[dict[str, Any]]) -> None:
@@ -193,6 +215,7 @@ def write_report(results: list[dict[str, Any]]) -> None:
         "| | " + " | ".join(cols) + " |",
         "|---|" + "---|" * len(cols),
         row("Hidden grading tests passed", lambda r: r["grading_score"]),
+        row("Used the docs search (docs-rag)", lambda r: "yes" if r["tool_calls_by_server"].get("docs-rag") else "no"),
         row("Agent's own tests (pass/fail)", lambda r: f"{r['agent_tests']['passed']}/{r['agent_tests']['failed']}"),
         row("Time (s)", lambda r: r["seconds"]),
         row("Model calls", lambda r: r["model_calls"]),
@@ -200,7 +223,8 @@ def write_report(results: list[dict[str, Any]]) -> None:
         row("Calls per server", lambda r: ", ".join(f"{k} {v}" for k, v in r["tool_calls_by_server"].items())),
         row("Tokens in/out", lambda r: f"{r['tokens']['input']}/{r['tokens']['output']}" if r["tokens"] else "n/a"),
         row("Hit step limit", lambda r: "yes" if r["hit_step_limit"] else "no"),
-        row("Errors", lambda r: len(r["errors"])),
+        row("Automatic recoveries", lambda r: len(r.get("recoveries", []))),
+        row("Errors that stopped the task", lambda r: len(r["errors"])),
     ]
     (RESULTS / "llm_compare.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print(f"\nSaved to {RESULTS / 'llm_compare.md'}")
@@ -214,7 +238,7 @@ async def main_async(models: list[str], pause: int, servers: Path) -> None:
             print(f"\n(waiting {pause}s so the next run starts with a fresh per-minute token allowance)")
             await asyncio.sleep(pause)
         results.append(await run_one(spec, settings, servers))
-    write_report(results)
+    write_report(all_runs())
 
 
 def main() -> None:

@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant CLI
+    participant Agent as Agentic Loop
+    participant LLM as LLM (Groq)
+    participant Gate as Confirmation Gate
+    participant MCP as MCP Client
+    participant TAV as Tavily server
+    participant Web
+    participant FS as Filesystem server
+
+    Note over User,FS: Auto mode. Task: "Find the latest FastAPI version and write NOTES.md with what's new."
+    User->>CLI: /mode auto
+    CLI->>Gate: auto_execute = True
+    CLI-->>User: mode: auto (runs everything without asking)
+    User->>CLI: types the task
+    CLI->>Agent: run(task)
+    Agent->>LLM: messages + tool schemas (stream)
+    LLM-->>Agent: tool call: tavily__tavily_search("FastAPI latest release", max_results 3)
+    Agent->>CLI: on_tool_start (cyan panel)
+    Agent->>Gate: risky?
+    Gate-->>Agent: no, run it
+    Agent->>MCP: call_tool(tavily, tavily_search)
+    MCP->>TAV: tools/call over HTTPS
+    TAV->>Web: search
+    Web-->>TAV: pages
+    TAV-->>MCP: 3 results with URLs and snippets
+    MCP-->>Agent: result (cut to 6,000 chars)
+    Agent->>LLM: + tool result
+    LLM-->>Agent: tool call: tavily__tavily_extract(release notes URL)
+    Agent->>MCP: call_tool(tavily, tavily_extract)
+    MCP->>TAV: tools/call
+    TAV-->>Agent: page text (cut to 6,000 chars)
+    Agent->>Agent: next request over budget, so older tool output is replaced by a short note
+    Agent->>LLM: + tool result
+    LLM-->>Agent: tool call: filesystem__write_file("NOTES.md", summary + link)
+    Agent->>Gate: risky?
+    Gate-->>Agent: yes, but auto mode: run without asking
+    Agent->>MCP: call_tool(filesystem, write_file)
+    MCP->>FS: tools/call
+    FS-->>Agent: "Successfully wrote to NOTES.md"
+    Agent->>LLM: + tool result
+    LLM-->>Agent: final answer, streamed
+    CLI-->>User: "corvus › The latest FastAPI release is ... I wrote a summary to NOTES.md."

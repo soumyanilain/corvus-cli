@@ -1,1 +1,1 @@
-"""Custom retrieval-augmented generation server for Corvus CLI."""
+"""docs-rag: custom MCP server with RAG over the FastAPI documentation."""

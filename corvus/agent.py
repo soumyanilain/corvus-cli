@@ -20,9 +20,11 @@ and, if needed, drops earlier tasks to stay under a token budget.
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import platform
+import re
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -42,7 +44,8 @@ from .config import DEFAULT_TREE_EXCLUDES, HIDDEN_TOOLS, Settings
 
 
 class AgentEvents(Protocol):
-    """What the loop tells the outside world. The CLI implements this."""
+    """What the loop tells the outside world. The CLI implements this.
+    (It may also implement on_notice(text) for short status messages.)"""
 
     def on_thinking(self) -> None: ...
     def on_token(self, text: str) -> None: ...
@@ -65,8 +68,7 @@ How to work:
   it ends with a note saying exactly how to read the rest: follow it. Don't re-read a file you already have.
 - grep_code searches inside files. filesystem__search_files finds files by name.
 - run_command runs shell commands (tests, git, pip, python) inside the workspace.
-- Use tavily__tavily_search (max_results 3) for anything you need from the web: docs, error messages, latest versions.
-- After every action, check the result. If something failed, read the error and try a different approach.
+{tool_hints}- After every action, check the result. If something failed, read the error and try a different approach.
 - If the user declines an action, don't try it again. Choose another approach or ask the user.
 - When the task is finished, reply with a short summary of what you did, without calling any tools.
 """
@@ -177,6 +179,51 @@ def _truncate_file_read(text: str, limit: int, args: dict[str, Any]) -> str:
     )
 
 
+def _was_cut_off(message: AIMessage) -> bool:
+    """True if the reply stopped because it hit the output-token limit."""
+
+    meta = message.response_metadata or {}
+    return meta.get("finish_reason") in ("length", "max_tokens") or meta.get("done_reason") == "length"
+
+
+def _error_hint(message: str) -> str:
+    """A plain-language next step for model errors we couldn't recover from."""
+
+    if "tokens per day (TPD)" in message:
+        return (
+            "This model's daily token allowance is used up. Switch to another model "
+            "with /model groq <name>, or try again later.\n\n"
+        )
+    if "Error code: 413" in message or "Request too large" in message:
+        return (
+            "The request was bigger than the model's size limit. "
+            "Type /clear and try again, or lower CORVUS_CONTEXT_BUDGET_GROQ in .env.\n\n"
+        )
+    return ""
+
+
+def _allow_null_optionals(schema: dict[str, Any]) -> dict[str, Any]:
+    """
+    Let optional top-level parameters be null.
+
+    Some models fill every optional parameter with null (e.g. head: null) to
+    mean "not set". Groq validates tool calls against the schema and rejects
+    those. Allowing null here, and dropping null arguments before the tool
+    runs (see _run_tool), turns that into a normal call.
+    """
+
+    required = set(schema.get("required", []))
+    for name, prop in (schema.get("properties") or {}).items():
+        if name in required or not isinstance(prop, dict):
+            continue
+        kind = prop.get("type")
+        if isinstance(kind, str) and kind != "null":
+            prop["type"] = [kind, "null"]
+        elif isinstance(kind, list) and "null" not in kind:
+            prop["type"] = kind + ["null"]
+    return schema
+
+
 def _clean_schema(schema: Any, max_desc: int = 150) -> Any:
     """
     Make a tool's input schema smaller and provider-friendly:
@@ -242,7 +289,7 @@ class Agent:
                 {
                     "name": tool["name"],
                     "description": (tool.get("description") or "")[:300],
-                    "input_schema": _clean_schema(tool["input_schema"]),
+                    "input_schema": _allow_null_optionals(_clean_schema(tool["input_schema"])),
                 }
             )
         return tools
@@ -252,12 +299,25 @@ class Agent:
         servers = sorted(
             {name.split("__", 1)[0] for name in self.tool_names if "__" in name}
         )
+        # Only mention the optional servers that actually connected.
+        hints = []
+        if any(name.startswith("docs-rag__") for name in self.tool_names):
+            hints.append(
+                "- Before writing or changing FastAPI code, look up how to do it with "
+                "docs-rag__search_docs (searches the official FastAPI documentation)."
+            )
+        if any(name.startswith("tavily__") for name in self.tool_names):
+            hints.append(
+                "- Use tavily__tavily_search (max_results 3) for anything else you need from the web: "
+                "latest versions, release notes, error messages, other libraries."
+            )
         return SYSTEM_PROMPT.format(
             workspace=self.workspace,
             os_name=platform.system(),
             shell="cmd.exe" if is_windows else "/bin/sh",
             servers=", ".join(servers) or "none",
             example_path=self.workspace / "README.md",
+            tool_hints="\n".join(hints) + ("\n" if hints else ""),
         )
 
     def set_model(self, model: BaseChatModel, context_budget: int) -> None:
@@ -266,6 +326,7 @@ class Agent:
         self.model = model
         self.llm = model.bind_tools(self.tools)
         self.context_budget = context_budget
+        self.max_tokens: int | None = None  # set if the provider reports an output-token limit
 
     def reset(self) -> None:
         """Forget the conversation (used by /clear)."""
@@ -354,8 +415,14 @@ class Agent:
             if not response.tool_calls:
                 return _text_of(response.content)
 
+            # A reply cut off by the output-token limit can still parse as a tool
+            # call (e.g. write_file with half the file), so don't run it.
+            cut_off = _was_cut_off(response)
             for call in response.tool_calls:
-                await self._run_tool(call)
+                if cut_off:
+                    self._reject_cut_off_call(call)
+                else:
+                    await self._run_tool(call)
 
         # Close the task in the history, so the next task doesn't pick it up again.
         self.messages.append(
@@ -367,12 +434,75 @@ class Agent:
         )
         return ""
 
-    async def _call_model(self) -> AIMessage | None:
-        """Stream one model response. Returns None if the call failed."""
+    def _reject_cut_off_call(self, call: dict[str, Any]) -> None:
+        """Tell the model its tool call was cut off, instead of running it."""
 
-        # Groq sometimes rejects a badly formed tool call from the model
-        # ("tool_use_failed"). Asking again usually works, so retry once.
-        for attempt in range(2):
+        name = call["name"]
+        limit = f"{self.max_tokens} tokens" if self.max_tokens else "the model's maximum"
+        message = (
+            f"Error: your reply was cut off at the output limit ({limit}), so this tool call "
+            "was incomplete and was NOT run. Make smaller changes: use edit_file to change a "
+            "few lines at a time. For a new or rewritten file, write a short first version, "
+            "then add the rest with edit_file."
+        )
+        self.events.on_tool_start(name, name.split("__", 1)[0] if "__" in name else "local", {})
+        self.events.on_tool_end(name, message, False)
+        self.messages.append(ToolMessage(content=message, tool_call_id=call["id"]))
+
+    def _notice(self, text: str) -> None:
+        notice = getattr(self.events, "on_notice", None)
+        if notice:
+            notice(text)
+
+    async def _recover(self, message: str, attempt: int) -> bool:
+        """
+        Try to fix a failed model call so it can be retried. Returns True to retry.
+        Covers the provider errors we actually hit while testing different models.
+        """
+
+        if attempt > 3:
+            return False
+
+        # The model produced a tool call that the provider couldn't parse or that
+        # didn't match the tool's schema. Asking again usually gives a valid one.
+        lowered = message.lower()
+        if any(
+            text in lowered
+            for text in ("tool_use_failed", "tool call validation failed", "failed to parse tool call")
+        ):
+            self._notice("The model sent an invalid tool call; asking again.")
+            return True
+
+        # Per-model limit on output tokens per minute (e.g. 1,000 on Groq's free tier).
+        # Cap the response length to that limit and wait for the minute to roll over
+        # (or for as long as the provider says, if it says).
+        otpm = re.search(r"output tokens per minute \(OTPM\): Limit (\d+)", message)
+        if otpm:
+            limit = int(otpm.group(1))
+            if self.max_tokens is None or self.max_tokens > limit:
+                self.max_tokens = limit
+                self.llm = self.model.bind_tools(self.tools).bind(max_tokens=limit)
+            retry_in = re.search(r"try again in ([\d.]+)s", message)
+            wait = min(60, int(float(retry_in.group(1))) + 1) if retry_in else 60
+            self._notice(f"Output-token limit ({limit}/min) reached; waiting {wait} s, then continuing.")
+            await asyncio.sleep(wait)
+            return True
+
+        # A single request was over the input-token limit: shrink the budget and re-fit.
+        if "Error code: 413" in message or ("Request too large" in message and "(TPM)" in message):
+            self.context_budget = int(self.context_budget * 0.75)
+            self._notice(f"Request too large; shrinking the context budget to ~{self.context_budget} tokens.")
+            self._fit_context()
+            return True
+
+        return False
+
+    async def _call_model(self) -> AIMessage | None:
+        """Stream one model response. Returns None if the call failed for good."""
+
+        attempt = 0
+        while True:
+            attempt += 1
             self.events.on_thinking()
             full = None
             try:
@@ -383,17 +513,11 @@ class Agent:
                     full = chunk if full is None else full + chunk
             except Exception as exc:  # network errors, rate limits, bad requests
                 message = str(exc)
-                if attempt == 0 and "tool_use_failed" in message:
+                if await self._recover(message, attempt):
                     continue
-                if "Request too large" in message or "413" in message:
-                    message = (
-                        "The request was bigger than the model's size limit. "
-                        "Type /clear and try again, or lower CORVUS_CONTEXT_BUDGET_GROQ in .env.\n\n"
-                        + message
-                    )
                 self.events.on_error(
                     f"Model call failed, so this task was stopped and removed from the "
-                    f"conversation.\n{type(exc).__name__}: {message}"
+                    f"conversation.\n{_error_hint(message)}{type(exc).__name__}: {message}"
                 )
                 return None
 
@@ -401,13 +525,12 @@ class Agent:
                 return AIMessage(content="")
             return message_chunk_to_message(full)
 
-        return None
-
     async def _run_tool(self, call: dict[str, Any]) -> None:
         """Run one tool call and add its result to the conversation."""
 
         name = call["name"]
-        args = dict(call.get("args") or {})
+        # Drop null arguments: "not set" (see _allow_null_optionals).
+        args = {k: v for k, v in (call.get("args") or {}).items() if v is not None}
         server = name.split("__", 1)[0] if "__" in name else "local"
 
         # directory_tree on a project root walks into venv/.git and returns

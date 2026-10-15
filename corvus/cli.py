@@ -117,6 +117,12 @@ class RichEvents:
         mark = Text("  ✓ " if ok else "  ✗ ", style="green" if ok else "red")
         self.console.print(mark + Text(short or "(no output)", style="dim"))
 
+    def on_notice(self, message: str) -> None:
+        """Short status message from the agent (retries, waiting on rate limits)."""
+        self.end_stream()
+        self.console.print(Text(f"  … {message}", style="yellow"))
+        self._start_status("[cyan]Thinking…[/cyan]")
+
     def on_error(self, message: str) -> None:
         self.end_stream()
         self.console.print(Panel(Text(message), title="Error", border_style="red", expand=False))

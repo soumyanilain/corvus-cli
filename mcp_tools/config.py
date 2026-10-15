@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,15 @@ def _expand_string(
 
         if key == "WORKSPACE":
             return str(workspace)
+
+        # ${PYTHON} = the interpreter running Corvus (the venv's python),
+        # so Python-based MCP servers get the same installed packages.
+        if key == "PYTHON":
+            return sys.executable
+
+        # ${PROJECT_ROOT} = the folder containing servers.json's packages.
+        if key == "PROJECT_ROOT":
+            return str(Path(__file__).resolve().parent.parent)
 
         return os.environ.get(
             key,
@@ -104,6 +114,14 @@ def load_server_config(
             "servers.json must contain "
             "an 'mcpServers' object."
         )
+
+    # Drop disabled servers first, so a missing key for a
+    # disabled server (e.g. Tavily) doesn't block startup.
+    servers = {
+        name: cfg
+        for name, cfg in servers.items()
+        if cfg.get("enabled", True)
+    }
 
     expanded = _expand(
         servers,

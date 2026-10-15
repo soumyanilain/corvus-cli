@@ -138,6 +138,25 @@ class ToolRegistry:
     async def execute(
         self,
         tool_name: str,
+        arguments: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Run a tool and always return a dict, never raise.
+        Errors go back to the model so it can try something else.
+        """
+
+        try:
+            return await self._execute(tool_name, arguments)
+        except Exception as exc:
+            return {
+                "ok": False,
+                "tool": tool_name,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    async def _execute(
+        self,
+        tool_name: str,
         arguments: dict[
             str,
             Any,

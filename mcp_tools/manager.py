@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,6 +59,9 @@ class MCPManager:
 
         self._connected = False
 
+        # server name -> error message, for servers that failed to start
+        self.failed_servers: dict[str, str] = {}
+
     @property
     def connected(self) -> bool:
         return self._connected
@@ -95,10 +99,26 @@ class MCPManager:
             ):
                 continue
 
-            await self._connect_server(
-                server_name,
-                config,
-            )
+            try:
+                await self._connect_server(
+                    server_name,
+                    config,
+                )
+            except Exception as exc:
+                # Keep going so the other servers still work.
+                # Mask API keys: HTTP errors often include the full
+                # URL, and Tavily's URL contains the key.
+                message = re.sub(
+                    r"(key=)[^&\s'\"]+",
+                    r"\1***",
+                    str(exc),
+                    flags=re.IGNORECASE,
+                )
+                self.failed_servers[server_name] = message
+                print(
+                    f"[warn] MCP server '{server_name}' "
+                    f"failed to start: {message}"
+                )
 
         self._connected = True
 
@@ -136,6 +156,11 @@ class MCPManager:
                 ),
                 env=config.get(
                     "env"
+                ),
+                # Optional working directory, e.g. so "python -m rag_server.server"
+                # finds the package no matter where Corvus was started from.
+                cwd=config.get(
+                    "cwd"
                 ),
             )
 

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corvus: Project Report</title>
+<style>
+  @page { size: Letter; margin: 0.8in 0.8in 0.85in 0.8in; }
+  :root { --ink:#1d1d1f; --muted:#5b5b66; --line:#d9d9e0; --accent:#6b2fb3; --soft:#f5f2fb; }
+  * { box-sizing: border-box; }
+  body { font-family: Inter, "DejaVu Sans", sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1 { font-size: 19pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
+  h2 { font-size: 14pt; margin: 22pt 0 6pt; padding-bottom: 3pt; border-bottom: 1.5px solid var(--accent); break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 14pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 7pt; }
+  ul, ol { margin: 0 0 8pt; padding-left: 18pt; }
+  li { margin-bottom: 2.5pt; }
+  code, pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.8pt; }
+  code { background: #f1f1f4; padding: 0 3px; border-radius: 3px; }
+  pre { background: #f6f6f8; border: 1px solid var(--line); border-radius: 5px; padding: 7pt 9pt; white-space: pre-wrap; break-inside: avoid; line-height: 1.4; }
+  table { border-collapse: collapse; width: 100%; margin: 4pt 0 10pt; font-size: 9.3pt; break-inside: avoid; }
+  th, td { border: 1px solid var(--line); padding: 4pt 6pt; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  figure { margin: 8pt 0 12pt; break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; }
+  figcaption { font-size: 8.8pt; color: var(--muted); margin-top: 4pt; }
+  .callout { background: var(--soft); border-left: 3px solid var(--accent); padding: 6pt 10pt; margin: 6pt 0 10pt; break-inside: avoid; }
+  .page-break { break-before: page; }
+  .muted { color: var(--muted); }
+  /* title page */
+  .title-page { height: 9.2in; display: flex; flex-direction: column; justify-content: center; }
+  .title-page .brand { font-family: "DejaVu Sans Mono", monospace; color: var(--accent); white-space: pre; font-size: 12pt; line-height: 1.15; margin-bottom: 18pt; }
+  .title-page h1 { font-size: 30pt; }
+  .title-page .sub { font-size: 14pt; color: var(--muted); margin-bottom: 26pt; }
+  .title-page table { width: auto; font-size: 10.5pt; }
+  .title-page td { border: none; padding: 2pt 18pt 2pt 0; }
+  .toc { font-size: 10pt; }
+  .toc li { margin-bottom: 1pt; }
+</style>
+</head>
+<body>
+
+<section class="title-page">
+<div class="brand">  _________  ______   ____  _______
+ / ___/ __ \/ ___/ | / / / / / ___/
+/ /__/ /_/ / /   | |/ / /_/ (__  )
+\___/\____/_/    |___/\__,_/____/</div>
+<h1>Corvus</h1>
+<div class="sub">An autonomous coding assistant for the terminal</div>
+<p><strong>ITCS 5010 · Group Project 2: CLI Coding Assistant · Group 6</strong></p>
+<table>
+  <tr><td>Soumyanil Ain</td><td class="muted">Lead · agent loop, provider layer, integration</td></tr>
+  <tr><td>Sogol Maghzian</td><td class="muted">MCP client, tool registry, confirmation gate, local tools</td></tr>
+  <tr><td>Meghana Thummalapally</td><td class="muted">Custom RAG server</td></tr>
+  <tr><td>Sumiran Juthuga</td><td class="muted">CLI and diagrams</td></tr>
+</table>
+<p style="margin-top:22pt">Repository: <code>github.com/soumyanilain/corvus-cli</code><br>October 15, 2026</p>
+<ol class="toc" style="margin-top:22pt">
+  <li>System overview</li>
+  <li>Design and design decisions</li>
+  <li>LLM comparison</li>
+  <li>Advanced RAG technique: reranking</li>
+  <li>Reflection</li>
+  <li>Architecture: original plan vs. final system</li>
+  <li>State and sequence diagrams</li>
+</ol>
+</section>
+
+<h2 class="page-break">1. System overview</h2>
+<p>Corvus is a command-line coding agent. You give it a task in plain English, for example <em>"make GET /books/{id} return 404 for missing books, add a test and run the tests"</em>, and it works on its own. It decides which tools it needs, reads and edits files, searches the FastAPI documentation or the web, runs commands, looks at the results, and keeps going until the task is done. The name comes from <em>Corvus</em>, the crow genus: crows are among the few animals that make and use tools.</p>
+<ul>
+  <li><strong>Agentic loop</strong>: reason → call tools → observe → repeat, until the model answers without asking for a tool (or 15 steps pass).</li>
+  <li><strong>Model-agnostic</strong>: Groq (cloud) and Ollama (local) behind one provider function; <code>/model</code> switches at runtime.</li>
+  <li><strong>Three MCP servers loaded dynamically</strong> from <code>servers.json</code>: the official filesystem server, Tavily web search, and <strong>docs-rag</strong>, our own server that searches the FastAPI docs with cross-encoder reranking.</li>
+  <li><strong>Visible, controllable tool use</strong>: every tool call is shown in a panel. In confirm mode Corvus asks before writing files or running commands; <code>/mode auto</code> lets it run without asking.</li>
+</ul>
+<pre>you › Search the FastAPI docs for how to return a 404 error
+╭─ ⚙ search_docs  via docs-rag ───╮
+│ {                               │
+│   "k": 4,                       │
+│   "query": "return a 404 error" │
+│ }                               │
+╰─────────────────────────────────╯
+  ✓ Top 4 FastAPI documentation passages for: return a 404 error
+(vector search over 20 candidates, ranked by fusion)
+[1] Response Status Code &gt; About HTTP status codes  (relevance 3.68)
+Source: https://fastapi.tiangolo.com/tutorial/response-status-code/
+… (66 more lines)
+corvus › Here's what the FastAPI docs say about returning a 404 Not Found response:
+   1. Use HTTPException
+      raise HTTPException(status_code=404, detail="Item not found")
+   …
+   Where to find it in the docs: Handling Errors – https://fastapi.tiangolo.com/tutorial/handling-errors/</pre>
+<p class="muted" style="margin-top:-4pt">A real session on our Windows test machine (abridged). Every tool call gets a panel naming the tool and the MCP server it came from.</p>
+
+<h2>2. Design and design decisions</h2>
+<figure>
+  <img src="../diagrams/architecture-v2.png" alt="Final architecture">
+  <figcaption>Figure 1. Final architecture (v2). The original planning diagram is in Section 6.</figcaption>
+</figure>
+
+<h3>2.1 Agentic loop</h3>
+<p>We wrote the loop ourselves (<code>corvus/agent.py</code>) instead of using a prebuilt agent, because we needed to stream text, show every tool call, pause mid-step for the user's approval, and manage the context window ourselves. Each step sends the conversation plus the tool schemas to the model. If the reply contains tool calls, each one is checked, approved if needed, executed, and its result is appended as a tool message; then the model is called again. A reply with no tool calls is the final answer. The loop never prints anything itself. It reports events (<code>on_token</code>, <code>on_tool_start</code>, <code>on_tool_end</code>, <code>on_error</code>) to the CLI, which keeps the loop testable and the UI replaceable.</p>
+<p>Failures are information, not crashes. A failed or unknown tool call, a bad regex, a path outside the workspace or a declined action all come back to the model as a short error message, so it can try something else. Errors from the model provider are handled in the loop too. The ones we met in testing are recovered automatically: a tool call the provider rejects (invalid JSON, or not matching the schema) is asked for again, <code>null</code> values for optional parameters are dropped, an output-tokens-per-minute limit caps the reply length and waits, a request that is too large shrinks the context budget, and a tool call from a reply the provider marks as cut off is not run. Section 3 shows where these came from. Each recovery appears as a short yellow note. If the call still fails, the task is removed from the history so the next question isn't answered as if it were the old one.</p>
+
+<h3>2.2 Provider abstraction</h3>
+<p><code>get_chat_model(provider, model)</code> returns a LangChain chat model for <code>groq</code> or <code>ollama</code>. The loop only uses <code>bind_tools()</code> and <code>astream()</code>, so it never knows which backend it is talking to; adding OpenAI or Anthropic would be one more branch. Groq's client retries automatically on rate limits. For Ollama we raise the context window to 16k tokens, because the default is too small for the tool definitions alone.</p>
+
+<h3>2.3 MCP integration</h3>
+<p>The MCP client (<code>mcp_tools/manager.py</code>) is built on the official MCP Python SDK v2. At startup it reads <code>servers.json</code>, expands <code>${WORKSPACE}</code>, <code>${PYTHON}</code> and environment variables, starts or connects to every enabled server, and pages through <code>tools/list</code>. Tools are registered as <code>server__tool</code> so names can't collide. Nothing is hard-coded: adding a server is a config change. If one server fails to start, Corvus warns and continues with the others.</p>
+<table>
+  <tr><th>Server</th><th>Transport</th><th>Tools given to the model</th></tr>
+  <tr><td>filesystem (official)</td><td>stdio via <code>npx</code>, sandboxed to the workspace</td><td>read_text_file, write_file, edit_file, list_directory, directory_tree, search_files, create_directory, move_file</td></tr>
+  <tr><td>tavily (external)</td><td>streamable HTTP</td><td>tavily_search, tavily_extract</td></tr>
+  <tr><td>docs-rag (ours)</td><td>stdio, <code>${PYTHON} -m rag_server.server</code></td><td>search_docs(query, k)</td></tr>
+</table>
+<p>The three servers offer 20 tools. We hide 9 duplicate or rarely useful ones, so with the two local tools (<code>run_command</code>, <code>grep_code</code>) the model sees 13. Every tool definition is re-sent on every request, so this matters (Section 2.6).</p>
+
+<h3>2.4 Tool calling and the CLI</h3>
+<p>The tool registry gives the loop one <code>execute()</code> for MCP tools and local tools. The confirmation gate marks tools whose names indicate a change (write, edit, move, create_directory, run_command, ...) as risky. In confirm mode their panel is yellow and the user must type <code>y</code>; a refusal goes back to the model as "the user declined this action". <code>run_command</code> has a timeout that kills the whole process tree (a code-review fix: killing only the shell left child processes holding the output pipe, so a dev server would hang Corvus forever). The CLI uses Rich: a branded banner, streamed answers, a panel per tool call with the server it came from, a short preview of each result, spinners, and the commands <code>/tools</code>, <code>/mode</code>, <code>/model</code>, <code>/clear</code>, <code>/exit</code>.</p>
+
+<h3>2.5 Custom RAG server (docs-rag)</h3>
+<p>docs-rag answers questions from the official FastAPI documentation. FastAPI fits a coding assistant well: the docs are clean Markdown with many code examples, and they are exactly what you want when writing an API.</p>
+<ul>
+  <li><strong>Ingestion (once):</strong> <code>python -m rag_server.ingest</code> sparse-clones the docs and code examples, loads 119 pages (skipping the 700 KB changelog and API stubs), inlines the code examples the docs pull in with <code>{* ../../docs_src/... *}</code>, splits by heading and then into ~1,000-character chunks with 150 overlap, prefixes each chunk with "Page &gt; Section", embeds them with <code>all-MiniLM-L6-v2</code>, and stores about 1,470 chunks in a persistent ChromaDB collection. Later sessions reuse it.</li>
+  <li><strong>Query:</strong> embed the question, take the 20 nearest chunks, rerank them with a cross-encoder, combine the vector and cross-encoder rankings with rank fusion (Section 4 explains why), and return the best 4 with page, section and link.</li>
+  <li>Two problems we only found by testing: LangChain's Markdown header splitter strips the leading spaces of every line, which destroyed Python indentation, so we wrote a small code-aware heading splitter. And most code in the FastAPI docs lives in separate files, so without inlining, coding questions retrieved prose with no code.</li>
+</ul>
+
+<h3>2.6 Context management</h3>
+<p>Groq's free tier rejects any single request over 8,000 tokens and limits tokens per minute and per day. Every request carries the full conversation and all tool definitions, and in our first real runs we hit all three limits: a 413 "request too large" on the second task, and a model that re-read the same file with ever bigger <code>head</code> values until the step limit, using most of a day's allowance. The loop now estimates each request's size and keeps it under a budget (6,000 tokens for Groq) by replacing old tool outputs with a short note and, if needed, dropping earlier tasks. Tool output is capped (12,000 characters for file reads, 6,000 otherwise). When a file is cut, the note says exactly how to read the rest (<em>"call read_text_file with tail=119"</em>). Repeated identical reads are refused. The step limit is 15. If a request is still rejected as too large, the budget is lowered by a quarter and the history trimmed again before retrying.</p>
+
+<h3>2.7 Key decisions</h3>
+<table>
+  <tr><th style="width:30%">Decision</th><th>Why</th></tr>
+  <tr><td>Hand-written loop, events to the UI</td><td>Control over streaming, confirmation and context; loop and UI are tested separately</td></tr>
+  <tr><td>Official MCP SDK v2 instead of an adapter library</td><td>Fewer dependencies; we control naming, paging and error handling</td></tr>
+  <tr><td>Groq as the cloud provider</td><td>Free tier, fast, good tool calling; Ollama for fully local use</td></tr>
+  <tr><td>Reranking as the advanced RAG technique, with rank fusion</td><td>Targets the main weakness of embedding search on docs (similar wording, wrong page) and is easy to measure on/off; fusion came out of that measurement</td></tr>
+  <tr><td>Confirm mode by default</td><td>The agent can overwrite files and run commands; auto mode is one command away</td></tr>
+  <tr><td>Errors returned to the model, never raised</td><td>The agent can recover by itself instead of the session crashing</td></tr>
+  <tr><td>Code review before every merge</td><td>Testing PR #1 found five bugs (startup crash, one failing server stopping all, timeouts not killing children, errors raised instead of returned, grep on one file) before we built on top of it</td></tr>
+</table>
+
+<h2 class="page-break">3. LLM comparison</h2>
+<p>We gave three models on Groq the same coding task, the same 13 tools and the same limits (15 steps, 6,000-token context budget), with no human in the loop. The models were OpenAI's open-weight <strong>gpt-oss-120b</strong> and <strong>gpt-oss-20b</strong>, and Alibaba's <strong>Qwen3.8 27B</strong>. <code>python -m eval.llm_compare</code> copies <code>eval/sample_project</code> (a small FastAPI "Bookshelf" API with a bug) to a fresh folder for each model and runs Corvus in auto mode on this task:</p>
+<div class="callout">Add a POST /books endpoint that accepts a JSON body validated with a Pydantic model (title non-empty, author, year between 1450 and 2100), stores the book with the next free id and returns it with status 201. GET /books/{book_id} crashes with a 500 error when the id doesn't exist; make it return 404. Check the FastAPI docs for how to do these. Add tests for both changes, then run the tests with <code>python -m pytest -q</code> and fix anything that fails.</div>
+<p>When the agent stops, we run the tests it wrote, then <strong>5 hidden grading tests</strong> (<code>eval/grading/test_grading.py</code>) that are copied in only afterwards, so no model sees them: POST returns 201 with an id and actually stores the book, a year of 3000 and an empty title are rejected with 422, a missing id returns 404, and the old endpoints still work. Every model call and tool call is logged in <code>eval/results/runs/</code>.</p>
+
+<table>
+  <tr><th style="width:24%"></th><th style="width:22%">gpt-oss-120b</th><th>gpt-oss-20b</th><th>Qwen3.8 27B</th></tr>
+  <tr><td><strong>Hidden grading tests passed</strong></td><td><strong>5/5</strong></td><td><strong>1/5</strong></td><td><strong>5/5</strong></td></tr>
+  <tr><td>Agent's own tests</td><td>4 written, 4 pass</td><td>none added (the 2 original tests pass)</td><td>test file left incomplete; pytest can't load it</td></tr>
+  <tr><td>Ran the tests itself</td><td>yes</td><td>no</td><td>no</td></tr>
+  <tr><td>Used the docs search (docs-rag)</td><td>no</td><td>no</td><td>yes, 3 searches</td></tr>
+  <tr><td>Tool calls (failed)</td><td>10 (0)</td><td>3 (0)</td><td>13 (1)</td></tr>
+  <tr><td>Model calls</td><td>11</td><td>7</td><td>13</td></tr>
+  <tr><td>Time</td><td>245 s</td><td>63 s</td><td>536 s</td></tr>
+  <tr><td>Tokens in / out</td><td>41,643 / 2,465</td><td>n/a*</td><td>n/a* (round 2: 91,871 / 2,459)</td></tr>
+  <tr><td>Automatic recoveries</td><td>0</td><td>3 retries of an invalid tool call, all failed</td><td>1 (output-token limit)</td></tr>
+  <tr><td>How the run ended</td><td>final summary</td><td>invalid tool-call JSON at its first edit</td><td>daily token limit reached</td></tr>
+</table>
+<p class="muted" style="margin-top:-4pt">Final run of each model (<code>eval/results/llm_compare.md</code>). One run per model, so these are observations, not statistics. *Usage figures are lost when a task ends with an error, because the task is removed from the conversation.</p>
+
+
+<h3>3.1 What each model did</h3>
+<p><strong>gpt-oss-120b</strong> solved the task in one clean pass. It listed the folder, read both files, added a <code>BookCreate</code> model with <code>Field(min_length=1)</code> and a year range, a POST endpoint with <code>status_code=201</code> and an <code>HTTPException(404)</code> for missing ids, read each file back and rewrote it in full to tidy it, ran <code>pytest</code> once (4 passed) and ended with a short, accurate summary. It never used the docs search, even though the task asked for it.</p>
+<p><strong>gpt-oss-20b</strong> never got past reading the two files, in three runs. In the first, it filled the optional <code>head</code> and <code>tail</code> parameters with <code>null</code>, and Groq's schema validation rejected the call before Corvus saw it. After we made optional parameters accept <code>null</code>, the next two runs failed at its first edit: Groq could not parse the tool call's arguments as JSON (the arguments carry code full of quotes and newlines), and three retries gave the same error. Its 1/5 is the untouched app passing "existing endpoints still work".</p>
+<p><strong>Qwen3.8 27B</strong> was the most careful and the least lucky. It read both files, searched the docs (three times in the final run: request body with <code>Field</code> validation; <code>HTTPException</code> 404; a POST returning 201), and then fixed <code>app.py</code> correctly in a single edit, scoring 5/5 in all three runs. Its free-tier limit of 1,000 output tokens per minute meant waiting about a minute between replies, so it was the slowest. The tests were its problem. In round 1 its six tests were complete and passed, but it hit the output limit before running them, which Corvus couldn't handle yet. In rounds 2 and 3, after Corvus capped its replies at 1,000 tokens, its writes to <code>test_app.py</code> arrived cut off mid-line (ending in <code>assert r</code> and <code>assert "</code>). It then wrote the same incomplete file again and again: six times in round 2 until the step limit, three times in round 3 until its daily allowance of 200,000 tokens ran out. The provider reported these replies as complete, so the check we added for cut-off replies didn't fire. We could not confirm whether the cap or the provider's tool-call parsing shortened them.</p>
+<p><strong>Three rounds.</strong> We ran the comparison three times on Oct 14–15, fixing Corvus between rounds (Section 2.1); gpt-oss-120b ran once, in round 1, and needed no changes. Each round got further and exposed a new problem: round 1 found the <code>null</code> arguments and the output limit, round 2 found that capping replies cut file writes short, and round 3 confirmed that the remaining failures were outside what retrying can fix.</p>
+
+
+<h3>3.2 What we learned</h3>
+<ul>
+  <li><strong>Making valid tool calls is the first skill an agent model needs.</strong> gpt-oss-20b knows FastAPI, but it could not produce a tool call carrying code that the provider would accept, so it never changed a file. The 120B model never sent an invalid call.</li>
+  <li><strong>Using the tools you are given is a separate skill from knowing the answer.</strong> The task and the system prompt both say to check the FastAPI docs. gpt-oss-120b never did: it knew FastAPI well enough, and it was right. Qwen searched the docs three times with sensible queries before writing anything. For a well-known library that changes little; for one the model doesn't know, it would be the difference. This is also why our demo asks for the docs search explicitly.</li>
+  <li><strong>On a free tier, the provider's limits shape the result as much as the model.</strong> Qwen's limit of 1,000 output tokens per minute made it twice as slow as gpt-oss-120b and, as far as we can tell, led to its cut-off file writes; its daily limit ended round 3. Most of the code we added after the comparison handles provider rules, not model mistakes: retrying invalid tool calls, accepting <code>null</code> for optional parameters, capping the reply length and waiting when an output limit is hit, shrinking the context after a "request too large", and not running a tool call from a reply marked as cut off. Each was tested with a scripted model before the next round.</li>
+  <li><strong>"The tests pass" is not the same as "the task is done", in both directions.</strong> gpt-oss-20b left the app untouched, and its original tests still passed (2 of 2) while the hidden tests scored 1 of 5. Qwen's code was correct (5 of 5 hidden), while the test file it wrote couldn't even load. The hidden tests are what make the comparison fair.</li>
+  <li><strong>A fix can create the next failure.</strong> Capping Qwen's replies let it continue past the output limit, but its file writes then came back short, and nothing told the model. Two cheap guards would have caught it, and are first on our list (Section 5): check that a written Python file still compiles and say so in the tool result, and refuse an identical write twice in a row.</li>
+</ul>
+
+
+<h2>4. Advanced RAG technique: reranking</h2>
+<p>The advanced technique is <strong>reranking</strong> (NirDiamant RAG_Techniques #17). Vector search pulls the 20 chunks whose embeddings are closest to the question; a cross-encoder (<code>ms-marco-MiniLM-L-6-v2</code>) then reads the question and each chunk <em>together</em> and scores how well the chunk answers it. Our final version combines the vector ranking and the cross-encoder ranking with Reciprocal Rank Fusion, <code>1/(60 + vector rank) + 1/(60 + rerank rank)</code>, and returns the top 4. Below is how we got there.</p>
+
+<h3>4.1 How we measured</h3>
+<p>We wrote 25 questions from the FastAPI docs, each labelled with the page(s) that answer it (<code>eval/rag_questions.json</code>). Many are phrased the way a developer would ask rather than in the docs' own words, for example <em>"My React frontend on another port gets blocked by the browser"</em> for the CORS page. <code>python -m eval.rag_eval</code> runs every question through the same index and the same 20 candidates with three ordering methods and records <strong>Hit@1</strong> (first result is from a correct page), <strong>Hit@4</strong> (a correct page is in the 4 results the agent receives), <strong>MRR</strong> (1 / rank of the first correct result) and latency on a laptop CPU.</p>
+
+<table>
+  <tr><th>Method</th><th class="num">Hit@1</th><th class="num">Hit@4</th><th class="num">MRR</th><th class="num">Time per search</th></tr>
+  <tr><td>Vector search only (baseline)</td><td class="num">76%</td><td class="num">92%</td><td class="num">0.830</td><td class="num">18 ms</td></tr>
+  <tr><td>+ Cross-encoder reranking</td><td class="num">80%</td><td class="num">88%</td><td class="num">0.830</td><td class="num">835 ms</td></tr>
+  <tr><td><strong>+ Reranking with rank fusion (final)</strong></td><td class="num"><strong>80%</strong></td><td class="num"><strong>92%</strong></td><td class="num"><strong>0.850</strong></td><td class="num">882 ms</td></tr>
+</table>
+<p class="muted">A correct page was among the 20 candidates for 24 of 25 questions (Recall@20 = 96%). With 25 questions, one question is 4 percentage points, so these differences are small and should be read as a direction, not a precise effect size.</p>
+
+<h3>4.2 What we learned</h3>
+<p><strong>The reranker is good at meaning, but it over-trusts matching words.</strong> On <em>"How do I make sure an integer in the URL path is greater than zero?"</em> vector search missed the right page completely (it returned the general path- and query-parameter pages); the cross-encoder put <code>path-params-numeric-validations.md</code> at #1. It also fixed the order for two more questions. But it lost three that vector search had right, each time by following a literal word: "receive <strong>JSON</strong> and validate it with Pydantic" went to an advanced page about JSON and Base64 instead of the request-body tutorial; "serve <strong>CSS</strong> and image files" went to the templates page instead of static files; "respond with status <strong>201</strong>" went to the advanced status-code pages, pushing the tutorial page to #4. The model was trained on web search (MS MARCO), where repeating the query's words is a strong signal. In documentation, advanced pages often repeat a term more than the beginner page that actually answers the question. Net effect of reranking alone: +4 points Hit@1, −4 points Hit@4, MRR unchanged.</p>
+<p><strong>Fusing the two rankings kept most of the gains and removed most of the damage.</strong> A chunk only stays at the top if both methods rank it well, so the reranker can't overrule vector search on a single word match. Static files went back to #1, status 201 to #2, and the HTML-form question improved to #1. Fusion is best on all three metrics. It isn't free of trade-offs: the numeric-validation page, where vector search was weak, drops from #1 to #4 (still inside the 4 results the agent sees), the Docker question slips from #1 to #2, and the JSON question stays lost because both methods rank the JSON/Base64 page highly.</p>
+<p><strong>Data preparation mattered more than the reranker.</strong> The baseline was already at 76% / 92%. We think that comes mostly from ingestion: inlining the code examples the docs keep in separate files, prefixing every chunk with "Page &gt; Section", splitting at headings, and skipping noise. For comparison, splitting the raw docs folder into fixed-size pieces without cleaning would have produced 1,798 chunks, 826 of them (46%) from the changelog, and 370 with include markers where the code should be.</p>
+<p><strong>Reordering can't fix what retrieval didn't fetch.</strong> <em>"How do I reuse the same pagination parameters across many endpoints?"</em> failed with every method: the dependencies page never uses the word "pagination", so it wasn't among the 20 candidates. Query rewriting (HyDE or query transformations) or hybrid keyword + vector search would be the next technique to try for this kind of vocabulary mismatch.</p>
+<p><strong>Cost.</strong> Reranking 20 pairs on a CPU makes a search about 50× slower (18 ms → 0.9 s). Inside the agent this is small compared with an LLM call (several seconds per step), so we kept it, and the server loads both models in a background thread at startup so the first search isn't slower still.</p>
+
+
+<h2 class="page-break">5. Reflection</h2>
+<h3>What worked</h3>
+<ul>
+  <li><strong>Writing the loop ourselves, with events instead of prints.</strong> Because the loop only reports events, we could test it end to end against the real MCP servers with a scripted stand-in model, without spending API tokens, and the CLI could change without touching the loop.</li>
+  <li><strong>MCP's dynamic loading paid off.</strong> Adding our RAG server to Corvus took one entry in <code>servers.json</code> and no change to the agent. The same is true for removing a server, or for one that fails to start: Corvus just loads the others.</li>
+  <li><strong>Testing every pull request before merging.</strong> Running PR #1 against the real filesystem server found five bugs before we built on top of it, including a timeout that never actually stopped child processes. Running the first RAG implementation found an import that no longer exists in MCP SDK v2 and <code>print()</code> calls that would have corrupted the stdio connection.</li>
+  <li><strong>Measuring instead of assuming.</strong> We expected reranking to help across the board. The evaluation showed it trades top-4 hits for top-1 accuracy, which led us to rank fusion, the best of the three methods we tried.</li>
+</ul>
+
+<h3>What did not work (at first)</h3>
+<ul>
+  <li><strong>The free tier shaped the design more than we expected.</strong> Every request re-sends all tool definitions and the whole conversation, so our second real task failed with "request too large", and one looping task used most of a day's token allowance. Context management became a component of its own (Section 2.6).</li>
+  <li><strong>Vague messages to the model cause loops.</strong> When a file was cut with "output truncated", the model kept re-reading it with bigger <code>head</code> values. A message that says exactly what to call next (<code>tail=119</code>) fixed it. Feedback written for the model needs the same care as a prompt.</li>
+  <li><strong>We tested with one model for too long.</strong> Everything worked with gpt-oss-120b, so the first round of the LLM comparison was a surprise: two of three models stopped early, on problems we had never seen (invalid tool calls, an output-token limit). Fixing them took three rounds on the last night, and each round exposed the next problem (Section 3). Trying several models in the first week would have spread this out.</li>
+  <li><strong>Small models make confident small mistakes.</strong> <code>gpt-oss-20b</code> explained "MCP" as "Machine-Code-Processor" while correctly describing the code around it.</li>
+  <li><strong>Team coordination.</strong> We planned to push a project skeleton with stub interfaces on Oct 2 so everyone could build against it. That slipped, most integration happened in the last week, and two RAG implementations were written in parallel on the final day; we kept the design of the first and merged the fixes of the second, with both authors credited. Windows-specific friction (<code>npx</code>, line endings, an editor saving old copies over new files, a brand-new Python 3.14) also cost time.</li>
+</ul>
+
+<h3>What we would improve</h3>
+<ul>
+  <li><strong>Confirmation from tool metadata, not names.</strong> The gate matches words like "write" or "edit" in tool names. A new server with a tool called <code>execute_query</code> would run without asking. MCP servers can mark tools with <code>readOnlyHint</code> (the filesystem server and ours do); the gate should use that, default to asking for unknown tools, and add "always allow this tool" and a diff preview before edits.</li>
+  <li><strong>Guard file writes.</strong> After a write to a Python file, check that it still compiles and put any syntax error in the tool result; refuse an identical write twice in a row; and log the provider's finish reason for every reply. Any of these would have caught Qwen's cut-off test file (Section 3).</li>
+  <li><strong>Better context management.</strong> Count tokens with the model's tokenizer instead of the 4-characters-per-token estimate, and summarize old turns instead of dropping them.</li>
+  <li><strong>RAG.</strong> Add query rewriting or keyword search for vocabulary mismatches (the "pagination" question), evaluate on more than 25 questions, and only rerank when the vector scores are close, to save the 0.9 s per search.</li>
+  <li><strong>Features from the optional list:</strong> session persistence, undo for file edits, and image input.</li>
+</ul>
+
+
+<h2 class="page-break">6. Architecture: original plan vs. final system</h2>
+<p>The diagram below was committed on Oct 1, before any code (tag <code>planning-v1</code>). Figure 1 shows the final system. The main differences and the reasons for them:</p>
+<figure>
+  <img src="../diagrams/architecture-v1.png" alt="Original architecture" style="max-height:5.2in">
+  <figcaption>Figure 2. Original architecture from the planning phase (v1).</figcaption>
+</figure>
+<table>
+  <tr><th style="width:20%">Area</th><th style="width:26%">Planned (v1)</th><th style="width:26%">Built (v2)</th><th>Why</th></tr>
+  <tr><td>MCP client</td><td>langchain-mcp-adapters</td><td>Official MCP SDK v2 <code>Client</code> in our <code>MCPManager</code></td><td>Fewer dependencies, direct control of tool names and errors</td></tr>
+  <tr><td>Tavily</td><td>Local <code>npx</code> process (stdio)</td><td>Hosted endpoint over HTTP</td><td>One less local process to manage on Windows</td></tr>
+  <tr><td>Config / CLI</td><td>config.yaml + .env; Rich + prompt_toolkit</td><td>.env only; Rich only</td><td>Simpler; nothing needed the extra pieces</td></tr>
+  <tr><td>Context management</td><td>"Truncate tool output"</td><td>Token budget, trimming, file-read hints, read guard, rollback, recovery from provider errors</td><td>Groq free-tier limits and a looping model in real runs; schema and output-limit errors in the LLM comparison</td></tr>
+  <tr><td>Tools shown</td><td>All</td><td>13 of 22, shorter descriptions</td><td>Tool definitions are re-sent on every request</td></tr>
+  <tr><td>Step limit</td><td>25</td><td>15</td><td>A loop used most of a day's token allowance</td></tr>
+  <tr><td>Confirmation</td><td>Read-only/mutating tags; "always allow"</td><td>Keyword match on tool names; y/N</td><td>Simpler; covers every tool we load (see Section 5)</td></tr>
+  <tr><td>RAG server</td><td>FastMCP; heading + 800-char chunks; top 5</td><td>MCPServer; code-aware splitter, inlined code, 1,000-char chunks; top 4 of 20 by rerank + rank fusion</td><td>SDK v2 rename; LangChain's splitter broke indentation; result size must fit the budget; fusion beat plain reranking in our evaluation</td></tr>
+  <tr><td>servers.json</td><td>Fixed commands</td><td><code>${PYTHON}</code>, <code>${PROJECT_ROOT}</code>, <code>cwd</code>, env vars</td><td>The RAG server must run with the venv's Python from the project folder</td></tr>
+  <tr><td>Evaluation</td><td>A question list</td><td>Scripts for RAG metrics and an LLM comparison with hidden grading tests</td><td>Repeatable numbers for this report</td></tr>
+</table>
+
+<h2 class="page-break">7. State and sequence diagrams</h2>
+<figure>
+  <img src="../diagrams/state.png" alt="State diagram" style="max-height:7.6in">
+  <figcaption>Figure 3. State diagram: how a session moves between states and how information flows between the CLI, the loop, the LLM, the confirmation gate and the tools.</figcaption>
+</figure>
+<figure class="page-break">
+  <img src="../diagrams/sequence-startup.png" alt="Startup sequence">
+  <figcaption>Figure 4. Sequence 1, startup and dynamic tool discovery: the MCP client starts three servers and lists their tools; the agent binds 13 tools to the model.</figcaption>
+</figure>
+<figure class="page-break">
+  <img src="../diagrams/sequence-coding-task.png" alt="Coding task sequence" style="max-height:8.4in">
+  <figcaption>Figure 5. Sequence 2, coding task in confirm mode: a docs search through the RAG server, a file read, a file edit that needs approval (with the "declined" branch), and a test run.</figcaption>
+</figure>
+<figure class="page-break">
+  <img src="../diagrams/sequence-web-task.png" alt="Web research sequence">
+  <figcaption>Figure 6. Sequence 3, web research in auto mode: Tavily search and extraction, context trimming, and a file write that runs without asking.</figcaption>
+</figure>
+
+</body>
+</html>

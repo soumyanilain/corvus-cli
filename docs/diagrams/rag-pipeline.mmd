@@ -1,0 +1,23 @@
+flowchart LR
+    subgraph once["Ingestion (run once)"]
+        direction TB
+        a["FastAPI repo<br/>docs/en/docs + docs_src<br/>(git sparse checkout)"] --> b["Load 119 pages<br/>skip changelog, API stubs,<br/>community pages"]
+        b --> c["Clean<br/>inline code examples,<br/>strip HTML + MkDocs syntax"]
+        c --> d["Split by #/##/### headings<br/>(code-block aware)"]
+        d --> e["Split to ~1000 chars,<br/>150 overlap; prefix<br/>'Page > Section'"]
+        e --> f["Embed<br/>all-MiniLM-L6-v2"]
+        f --> g[("ChromaDB<br/>cosine, persistent")]
+    end
+
+    subgraph query["Each search_docs call"]
+        direction TB
+        q["Question from the agent"] --> qe["Embed question"]
+        qe --> vs["Vector search<br/>top 20 candidates"]
+        vs --> rr["Cross-encoder reranking<br/>ms-marco-MiniLM-L-6-v2<br/>scores (question, chunk) pairs"]
+        rr --> fu["Rank fusion (RRF)<br/>1/(60+vector rank) + 1/(60+rerank rank)"]
+        vs -. "vector ranking" .-> fu
+        fu --> top["Keep best 4<br/>+ title, section, URL"]
+        top --> out["Text back to the agent<br/>(~4,500 chars)"]
+    end
+
+    g -. "same index every session" .-> vs

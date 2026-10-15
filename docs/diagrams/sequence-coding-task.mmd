@@ -1,0 +1,61 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant CLI
+    participant Agent as Agentic Loop
+    participant LLM as LLM (Groq)
+    participant Gate as Confirmation Gate
+    participant MCP as MCP Client
+    participant RAG as docs-rag server
+    participant FS as Filesystem server
+    participant Shell as run_command (local)
+
+    Note over User,Shell: Confirm mode. Task: "Make GET /books/{id} return 404 for missing books, add a test, run the tests."
+    User->>CLI: types the task
+    CLI->>Agent: run(task)
+    Agent->>Agent: fit context to token budget
+    Agent->>LLM: messages + 13 tool schemas (stream)
+    LLM-->>Agent: tool call: docs-rag__search_docs("return 404 not found error")
+    Agent->>CLI: on_tool_start (cyan panel)
+    Agent->>Gate: search_docs risky?
+    Gate-->>Agent: no (read-only), run it
+    Agent->>MCP: call_tool(docs-rag, search_docs)
+    MCP->>RAG: tools/call
+    RAG->>RAG: embed query, ChromaDB top 20,<br/>cross-encoder rerank + rank fusion, keep 4
+    RAG-->>MCP: 4 passages from tutorial/handling-errors.md (HTTPException)
+    MCP-->>Agent: result
+    Agent->>CLI: on_tool_end ✓ preview
+    Agent->>LLM: + tool result
+    LLM-->>Agent: tool call: filesystem__read_text_file("app.py")
+    Agent->>MCP: call_tool(filesystem, read_text_file)
+    MCP->>FS: tools/call
+    FS-->>Agent: app.py contents
+    Agent->>LLM: + tool result
+    LLM-->>Agent: tool call: filesystem__edit_file(app.py, raise HTTPException(404))
+    Agent->>CLI: on_tool_start (yellow panel, shows the edit)
+    Agent->>Gate: edit_file risky?
+    Gate->>CLI: ask permission
+    CLI-->>User: Allow this action? [y/N]
+    alt user types y
+        User->>CLI: y
+        CLI-->>Gate: approved
+        Gate-->>Agent: approved
+        Agent->>MCP: call_tool(filesystem, edit_file)
+        MCP->>FS: tools/call
+        FS-->>Agent: git-style diff of the change
+    else user types n
+        User->>CLI: n
+        Gate-->>Agent: declined
+        Agent->>LLM: "The user declined this action..."
+    end
+    Agent->>LLM: + tool result
+    LLM-->>Agent: tool call: run_command("python -m pytest -q")
+    Agent->>Gate: run_command risky?
+    Gate->>CLI: ask permission
+    User->>CLI: y
+    Agent->>Shell: run pytest in the workspace (timeout 120 s)
+    Shell-->>Agent: exit code 0, "3 passed"
+    Agent->>LLM: + tool result
+    LLM-->>Agent: final answer (no tool calls), streamed
+    Agent->>CLI: on_token ...
+    CLI-->>User: "corvus › GET /books/{id} now returns 404 ... all 3 tests pass."

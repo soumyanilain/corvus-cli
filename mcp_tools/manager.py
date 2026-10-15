@@ -157,6 +157,11 @@ class MCPManager:
                 env=config.get(
                     "env"
                 ),
+                # Optional working directory, e.g. so "python -m rag_server.server"
+                # finds the package no matter where Corvus was started from.
+                cwd=config.get(
+                    "cwd"
+                ),
             )
 
         elif transport in {

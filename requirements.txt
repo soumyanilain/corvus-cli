@@ -1,4 +1,4 @@
-# MCP client (Sogol)
+# MCP client and tools
 mcp>=2.0.0
 python-dotenv>=1.0.0
 
@@ -9,3 +9,13 @@ langchain-ollama>=1.0
 
 # Terminal UI
 rich>=13.0
+
+# Custom RAG MCP server (docs-rag)
+chromadb>=1.0
+sentence-transformers>=3.0
+langchain-text-splitters>=1.0
+
+# Sample project used in the demo and the LLM comparison
+fastapi>=0.115
+httpx>=0.27
+pytest>=8.0

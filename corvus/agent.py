@@ -65,8 +65,7 @@ How to work:
   it ends with a note saying exactly how to read the rest: follow it. Don't re-read a file you already have.
 - grep_code searches inside files. filesystem__search_files finds files by name.
 - run_command runs shell commands (tests, git, pip, python) inside the workspace.
-- Use tavily__tavily_search (max_results 3) for anything you need from the web: docs, error messages, latest versions.
-- After every action, check the result. If something failed, read the error and try a different approach.
+{tool_hints}- After every action, check the result. If something failed, read the error and try a different approach.
 - If the user declines an action, don't try it again. Choose another approach or ask the user.
 - When the task is finished, reply with a short summary of what you did, without calling any tools.
 """
@@ -252,12 +251,25 @@ class Agent:
         servers = sorted(
             {name.split("__", 1)[0] for name in self.tool_names if "__" in name}
         )
+        # Only mention the optional servers that actually connected.
+        hints = []
+        if any(name.startswith("docs-rag__") for name in self.tool_names):
+            hints.append(
+                "- Before writing or changing FastAPI code, look up how to do it with "
+                "docs-rag__search_docs (searches the official FastAPI documentation)."
+            )
+        if any(name.startswith("tavily__") for name in self.tool_names):
+            hints.append(
+                "- Use tavily__tavily_search (max_results 3) for anything else you need from the web: "
+                "latest versions, release notes, error messages, other libraries."
+            )
         return SYSTEM_PROMPT.format(
             workspace=self.workspace,
             os_name=platform.system(),
             shell="cmd.exe" if is_windows else "/bin/sh",
             servers=", ".join(servers) or "none",
             example_path=self.workspace / "README.md",
+            tool_hints="\n".join(hints) + ("\n" if hints else ""),
         )
 
     def set_model(self, model: BaseChatModel, context_budget: int) -> None:

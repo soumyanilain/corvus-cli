@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant CLI as CLI (corvus/cli.py)
+    participant Reg as Tool Registry
+    participant MCP as MCP Client (MCPManager)
+    participant FS as Filesystem server
+    participant TAV as Tavily server
+    participant RAG as docs-rag server
+    participant Agent as Agentic Loop
+    participant LLM as LLM (Groq)
+
+    User->>CLI: python -m corvus --workspace D:\corvus-demo
+    CLI->>MCP: connect_all(servers.json, workspace)
+    MCP->>MCP: load servers.json, expand ${WORKSPACE} ${PYTHON} ${TAVILY_API_KEY}
+    MCP->>FS: start "npx server-filesystem D:\corvus-demo" (stdio)
+    FS-->>MCP: initialize OK
+    MCP->>FS: tools/list
+    FS-->>MCP: 14 tools (read_text_file, write_file, edit_file, ...)
+    MCP->>TAV: connect over HTTPS (API key in URL)
+    TAV-->>MCP: 5 tools (tavily_search, tavily_extract, ...)
+    MCP->>RAG: start "python -m rag_server.server" (stdio)
+    RAG-->>MCP: initialize OK
+    Note over RAG: background thread loads ChromaDB,<br/>embedding model and cross-encoder
+    MCP->>RAG: tools/list
+    RAG-->>MCP: search_docs(query, k)
+    MCP-->>Reg: 20 MCP tools, named server__tool
+    Reg-->>CLI: + run_command, grep_code (local)
+    CLI->>Agent: Agent(registry, model)
+    Agent->>Agent: hide 9 duplicate/rare tools, shrink schemas
+    Agent->>LLM: bind_tools(13 tool schemas)
+    CLI-->>User: banner, model, mode, "filesystem (8), local (2), tavily (2), docs-rag (1)"
+    User->>CLI: /tools
+    CLI-->>User: table of tools per server, which ones ask first

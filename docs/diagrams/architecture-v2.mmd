@@ -1,0 +1,58 @@
+flowchart TB
+    user([Developer in terminal])
+
+    subgraph app["Corvus process (Python 3.11+, asyncio)"]
+        cli["CLI / REPL (Rich)<br/>streaming output, tool-call panels,<br/>spinners, /tools /mode /model /clear"]
+        loop["Agentic Loop<br/>reason → act → observe → repeat<br/>stops on final answer or 15 steps"]
+        ctx["Context manager<br/>token budget, trims old tool output,<br/>file-read hints, repeat-read guard"]
+        prov["Provider Layer<br/>get_chat_model(provider, model)<br/>LangChain ChatGroq / ChatOllama"]
+        reg["Tool Registry + Confirmation Gate<br/>confirm mode: ask before write/run<br/>auto mode: run everything"]
+        mcpc["MCP Client (MCPManager)<br/>official mcp SDK v2 Client<br/>reads servers.json, lists tools at startup"]
+        local["Local Tools<br/>run_command, grep_code"]
+        cfg[(".env<br/>keys, default model,<br/>budgets")]
+    end
+
+    subgraph llms["LLM backends"]
+        groq["Groq (cloud)<br/>gpt-oss-120b, llama-3.3-70b, ..."]
+        ollama["Ollama (local)<br/>llama3.1:8b, ..."]
+    end
+
+    subgraph servers["MCP servers"]
+        fs["filesystem<br/>@modelcontextprotocol/server-filesystem<br/>stdio via npx"]
+        tav["tavily (external)<br/>remote, streamable HTTP"]
+        rag["docs-rag (ours)<br/>MCPServer, stdio<br/>search_docs(query, k)"]
+    end
+
+    ws[("Workspace folder")]
+    web(("Web"))
+
+    subgraph ragint["docs-rag internals"]
+        retr["Retriever<br/>embed query → top 20 by cosine<br/>→ cross-encoder rerank<br/>→ fuse both rankings (RRF) → top 4"]
+        chroma[("ChromaDB<br/>data/chroma<br/>~1,470 chunks")]
+        models["all-MiniLM-L6-v2 (embeddings)<br/>ms-marco-MiniLM-L-6-v2 (reranker)"]
+    end
+
+    subgraph ingest["One-time ingestion: python -m rag_server.ingest"]
+        docs["FastAPI docs + code examples<br/>(git sparse checkout)"] --> clean["Clean Markdown<br/>inline code examples"] --> split["Split by heading,<br/>then ~1000 chars"] --> embed["Embed"]
+    end
+
+    user <--> cli
+    cli <--> loop
+    cfg -.-> loop
+    loop <--> ctx
+    loop <--> prov
+    prov --> groq
+    prov --> ollama
+    loop <--> reg
+    reg --> local
+    reg --> mcpc
+    mcpc -- "stdio" --> fs
+    mcpc -- "HTTPS" --> tav
+    mcpc -- "stdio" --> rag
+    fs --> ws
+    local --> ws
+    tav --> web
+    rag --> retr
+    retr --> chroma
+    retr --> models
+    embed --> chroma

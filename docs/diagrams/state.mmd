@@ -1,0 +1,49 @@
+stateDiagram-v2
+    direction TB
+
+    [*] --> Starting
+    state "Starting<br/>load .env + servers.json<br/>MCP client connects to each server<br/>and lists its tools" as Starting
+    Starting --> Idle: tools registered,<br/>banner shown
+    Starting --> Idle: a server failed<br/>(warning, others still load)
+
+    state "Idle<br/>waiting at the you › prompt" as Idle
+    Idle --> SlashCommand: /tools /mode /model /clear
+    SlashCommand --> Idle
+    Idle --> ShuttingDown: /exit or Ctrl+C
+
+    Idle --> FitContext: user types a task
+
+    state "Agentic loop (max 15 steps)" as Loop {
+        state "Fit context<br/>estimate tokens; trim old tool<br/>output / old tasks if over budget" as FitContext
+        state "Calling LLM<br/>stream tokens to the terminal<br/>(Groq or Ollama, tools attached)" as CallingLLM
+        state "Checking the tool call<br/>unknown tool? same read repeated?" as CheckCall
+        state "Awaiting confirmation<br/>yellow panel + Allow? y/N" as AwaitConfirm
+        state "Executing tool<br/>local tool or MCP server<br/>(filesystem, tavily, docs-rag)" as Executing
+        state "Recording result<br/>truncate, add ToolMessage" as Record
+
+        FitContext --> CallingLLM
+        CallingLLM --> CheckCall: response has tool calls
+        CheckCall --> Record: rejected (error text<br/>goes back to the model)
+        CheckCall --> AwaitConfirm: risky tool + confirm mode
+        CheckCall --> Executing: read-only tool or auto mode
+        AwaitConfirm --> Executing: user says y
+        AwaitConfirm --> Record: user says n<br/>("user declined")
+        Executing --> Record: result or error
+        Record --> CheckCall: more tool calls<br/>in this response
+        Record --> FitContext: all calls done,<br/>ask the model again
+    }
+
+    CallingLLM --> Answered: no tool calls
+    state "Answered<br/>final answer streamed" as Answered
+    Answered --> Idle
+
+    CallingLLM --> TaskFailed: API error / rate limit<br/>after retries
+    state "Task failed<br/>error panel; task removed<br/>from the history" as TaskFailed
+    TaskFailed --> Idle
+
+    Record --> StepLimit: 15 steps used
+    state "Step limit<br/>task closed in history" as StepLimit
+    StepLimit --> Idle
+
+    state "Shutting down<br/>close MCP sessions,<br/>stop server processes" as ShuttingDown
+    ShuttingDown --> [*]

@@ -18,7 +18,7 @@ ITCS 5010 · Group Project 2: CLI Coding Assistant · Group 6
   |---|---|
   | `filesystem` (official `@modelcontextprotocol/server-filesystem`) | read, write, edit, list and search files, sandboxed to the workspace |
   | `tavily` (external resource server) | web search and page extraction |
-  | `docs-rag` (ours, [`rag_server/`](rag_server/)) | search over the FastAPI documentation with vector search + cross-encoder **reranking** |
+  | `docs-rag` (ours, [`rag_server/`](rag_server/)) | search over the FastAPI documentation: vector search + cross-encoder **reranking** + rank fusion |
 
 - **Local tools:** `run_command` (shell) and `grep_code` (search inside files)
 - **Confirm or auto mode:** approve each file write and shell command, or let it run on its own
@@ -80,7 +80,7 @@ Then ask, for example: *"Add a POST /books endpoint with Pydantic validation, ma
 ## Evaluation
 
 ```powershell
-python -m eval.rag_eval        # vector search vs. vector search + reranking, 25 questions
+python -m eval.rag_eval        # vector search vs. reranking vs. rank fusion, 25 questions
 python -m eval.llm_compare     # two LLMs on the same coding task, graded by hidden tests
 ```
 

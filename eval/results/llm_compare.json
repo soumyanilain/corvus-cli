@@ -1,0 +1,139 @@
+[
+  {
+    "model": "groq:openai/gpt-oss-120b",
+    "seconds": 245.1,
+    "model_calls": 11,
+    "tool_calls": 10,
+    "failed_tool_calls": 0,
+    "tool_calls_by_server": {
+      "filesystem": 9,
+      "local": 1
+    },
+    "tools_used": {
+      "list_directory": 1,
+      "read_text_file": 4,
+      "edit_file": 2,
+      "write_file": 2,
+      "run_command": 1
+    },
+    "hit_step_limit": false,
+    "errors": [],
+    "tokens": {
+      "input": 41643,
+      "output": 2465
+    },
+    "agent_tests": {
+      "passed": 4,
+      "failed": 0,
+      "exit_code": 0,
+      "tail": [
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "4 passed, 2 warnings in 0.17s"
+      ]
+    },
+    "grading": {
+      "passed": 5,
+      "failed": 0,
+      "exit_code": 0,
+      "tail": [
+        "",
+        "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+        "5 passed, 2 warnings in 0.19s"
+      ]
+    },
+    "grading_score": "5/5",
+    "final_answer": "Implemented the requested features:\n\n1. Added a `BookCreate` Pydantic model with validation for title, author, and year.\n2. Created a POST `/books` endpoint that stores a new book with an auto\u2011incremented ID and returns it with a 201 status.\n3. Updated the GET `/books/{book_id}` endpoint to raise a 404 `HTTPException` when a book isn\u2019t found.\n4. Added tests for creating a book and for handling a non\u2011existent book request.\n5. Adjusted the test file ordering and ensured the FastAPI client is set up correctly.\n\nAll tests now pass (`4 passed`)."
+  },
+  {
+    "model": "groq:openai/gpt-oss-20b",
+    "seconds": 63.0,
+    "model_calls": 7,
+    "tool_calls": 3,
+    "failed_tool_calls": 0,
+    "tool_calls_by_server": {
+      "filesystem": 3
+    },
+    "tools_used": {
+      "list_directory": 1,
+      "read_text_file": 2
+    },
+    "hit_step_limit": false,
+    "errors": [
+      "Model call failed, so this task was stopped and removed from the conversation.\nAPIError: Failed to parse tool call arguments as JSON"
+    ],
+    "recoveries": [
+      "The model sent an invalid tool call; asking again.",
+      "The model sent an invalid tool call; asking again.",
+      "The model sent an invalid tool call; asking again."
+    ],
+    "tokens": null,
+    "agent_tests": {
+      "passed": 2,
+      "failed": 0,
+      "exit_code": 0,
+      "tail": [
+        "..                                                                       [100%]",
+        "2 passed in 0.23s"
+      ]
+    },
+    "grading": {
+      "passed": 1,
+      "failed": 4,
+      "exit_code": 1,
+      "tail": [
+        "FAILED _grading_test.py::test_empty_title_is_rejected - assert 405 == 422",
+        "FAILED _grading_test.py::test_missing_book_returns_404 - KeyError: 9999",
+        "4 failed, 1 passed in 0.86s"
+      ]
+    },
+    "grading_score": "1/5",
+    "final_answer": ""
+  },
+  {
+    "model": "groq:qwen/qwen3.8-27b",
+    "seconds": 536.0,
+    "model_calls": 13,
+    "tool_calls": 13,
+    "failed_tool_calls": 1,
+    "tool_calls_by_server": {
+      "filesystem": 10,
+      "docs-rag": 3
+    },
+    "tools_used": {
+      "read_text_file": 3,
+      "search_docs": 3,
+      "edit_file": 4,
+      "write_file": 3
+    },
+    "hit_step_limit": false,
+    "errors": [
+      "Model call failed, so this task was stopped and removed from the conversation.\nThis model's daily token allowance is used up. Switch to another model with /model groq <name>, or try again later.\n\nRateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_(redacted)` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 195886, Requested 6931. Please try again in 20m16.944s. Need more tokens? Upgrade"
+    ],
+    "recoveries": [
+      "Output-token limit (1000/min) reached; waiting 60 s, then continuing."
+    ],
+    "tokens": null,
+    "agent_tests": {
+      "passed": 0,
+      "failed": 1,
+      "exit_code": 2,
+      "tail": [
+        "ERROR test_app.py",
+        "!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!",
+        "1 error in 0.56s"
+      ]
+    },
+    "grading": {
+      "passed": 5,
+      "failed": 0,
+      "exit_code": 0,
+      "tail": [
+        ".....                                                                    [100%]",
+        "5 passed in 0.27s"
+      ]
+    },
+    "grading_score": "5/5",
+    "final_answer": ""
+  }
+]

@@ -1,0 +1,213 @@
+{
+  "model": "groq:qwen/qwen3.8-27b",
+  "seconds": 536.0,
+  "model_calls": 13,
+  "tool_calls": 13,
+  "failed_tool_calls": 1,
+  "tool_calls_by_server": {
+    "filesystem": 10,
+    "docs-rag": 3
+  },
+  "tools_used": {
+    "read_text_file": 3,
+    "search_docs": 3,
+    "edit_file": 4,
+    "write_file": 3
+  },
+  "hit_step_limit": false,
+  "errors": [
+    "Model call failed, so this task was stopped and removed from the conversation.\nThis model's daily token allowance is used up. Switch to another model with /model groq <name>, or try again later.\n\nRateLimitError: Error code: 429 - {'error': {'message': 'Rate limit reached for model `qwen/qwen3.8-27b` in organization `org_(redacted)` service tier `on_demand` on tokens per day (TPD): Limit 200000, Used 195886, Requested 6931. Please try again in 20m16.944s. Need more tokens? Upgrade"
+  ],
+  "recoveries": [
+    "Output-token limit (1000/min) reached; waiting 60 s, then continuing."
+  ],
+  "tokens": null,
+  "agent_tests": {
+    "passed": 0,
+    "failed": 1,
+    "exit_code": 2,
+    "tail": [
+      "ERROR test_app.py",
+      "!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!",
+      "1 error in 0.56s"
+    ]
+  },
+  "grading": {
+    "passed": 5,
+    "failed": 0,
+    "exit_code": 0,
+    "tail": [
+      ".....                                                                    [100%]",
+      "5 passed in 0.27s"
+    ]
+  },
+  "grading_score": "5/5",
+  "final_answer": "",
+  "steps": [
+    {
+      "tool": "filesystem__read_text_file",
+      "server": "filesystem",
+      "args": {
+        "path": "app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "\"\"\"Bookshelf API: a tiny FastAPI app used for Corvus demos and the LLM comparison.\"\"\"\n\nfrom fastapi import FastAPI\n\napp = FastAPI(title=\"Bookshelf API\")\n\nBOOKS: dict[int, dict] = {\n    1: {\"id\": 1, \"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965},\n    2: {\"id\": 2, \"title\": \"Neuromancer\", \"a"
+    },
+    {
+      "tool": "filesystem__read_text_file",
+      "server": "filesystem",
+      "args": {
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.0,
+      "result": "from fastapi.testclient import TestClient\n\nfrom app import app\n\nclient = TestClient(app)\n\n\ndef test_list_books():\n    response = client.get(\"/books\")\n    assert response.status_code == 200\n    assert len(response.json()) == 2\n\n\ndef test_get_book():\n    response = client.get(\"/books/1\")\n    assert re"
+    },
+    {
+      "tool": "docs-rag__search_docs",
+      "server": "docs-rag",
+      "args": {
+        "query": "Pydantic request body model with Field validation constraints, returning 201 status code"
+      },
+      "ok": true,
+      "seconds": 12.81,
+      "result": "Top 4 FastAPI documentation passages for: Pydantic request body model with Field validation constraints, returning 201 status code\n(vector search over 20 candidates, ranked by fusion)\n\n[1] Body - Fields > Recap  (relevance 1.43)\nSource: https://fastapi.tiangolo.com/tutorial/body-fields/\nYou can use "
+    },
+    {
+      "tool": "docs-rag__search_docs",
+      "server": "docs-rag",
+      "args": {
+        "query": "raise HTTPException 404 not found"
+      },
+      "ok": true,
+      "seconds": 2.17,
+      "result": "Top 4 FastAPI documentation passages for: raise HTTPException 404 not found\n(vector search over 20 candidates, ranked by fusion)\n\n[1] Handling Errors > Use `HTTPException` > Raise an `HTTPException` in your code  (relevance 4.99)\nSource: https://fastapi.tiangolo.com/tutorial/handling-errors/\n`HTTPEx"
+    },
+    {
+      "tool": "docs-rag__search_docs",
+      "server": "docs-rag",
+      "args": {
+        "query": "status_code 201 response model POST create item example"
+      },
+      "ok": true,
+      "seconds": 2.33,
+      "result": "Top 4 FastAPI documentation passages for: status_code 201 response model POST create item example\n(vector search over 20 candidates, ranked by fusion)\n\n[1] Response - Change Status Code > Use case  (relevance 6.62)\nSource: https://fastapi.tiangolo.com/advanced/response-change-status-code/\nFor exampl"
+    },
+    {
+      "tool": "filesystem__edit_file",
+      "server": "filesystem",
+      "args": {
+        "edits": [
+          {
+            "newText": "from fastapi import FastAPI, HTTPException\nfrom pydantic import BaseModel, Field\n\napp = FastAPI(title=\"Bookshelf API\")",
+            "oldText": "from fastapi import FastAPI\n\napp = FastAPI(title=\"Bookshelf API\")"
+          },
+          {
+            "newText": "class BookIn(BaseModel):\n    \"\"\"Payload for creating a new book.\"\"\"\n\n    title: str = Field(min_length=1)\n    author: str\n    year: int = Field(ge=1450, le=2100)\n\n\n@app.get(\"/books\")",
+            "oldText": "@app.get(\"/books\")"
+          },
+          {
+            "newText": "@app.get(\"/books/{book_id}\")\ndef get_book(book_id: int):\n    \"\"\"Return one book by id.\"\"\"\n    book = BOOKS.get(book_id)\n    if book is None:\n        raise HTTPException(status_code=404, detail=\"Book not found\")\n    return book\n\n\n@app.post(\"/books\", status_code=201)\ndef create_book(book: BookIn):\n    \"\"\"Add a new book to the shelf and return it.\"\"\"\n    new_id = max(BOOKS, default=0) + 1\n    new_book = {\"id\": new_id, **book.model_dump()}\n    BOOKS[new_id] = new_book\n    return new_book",
+            "oldText": "@app.get(\"/books/{book_id}\")\ndef get_book(book_id: int):\n    \"\"\"Return one book by id.\"\"\"\n    return BOOKS[book_id]"
+          }
+        ],
+        "path": "app.py"
+      },
+      "ok": true,
+      "seconds": 0.03,
+      "result": "```diff\nIndex: D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\app.py\n===================================================================\n--- D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\app.py\toriginal\n+++ D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\app.py\tmodified\n@@ -1,7 +1,8 @@\n \"\"\""
+    },
+    {
+      "tool": "filesystem__edit_file",
+      "server": "filesystem",
+      "args": {
+        "edits": [
+          {
+            "newText": "def test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404\n    assert response.json() == {\"detail\": \"Book not found\"}\n\n\ndef test_create_book_returns_201_and_next_id():\n    response = client.post(\n        \"/books\",\n        json={\"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965},\n    )\n    assert response.status_code == 201\n    assert response.json() == {\n        \"id\": 3,\n        \"title\": \"Dune\",\n        \"author\": \"Frank Herbert\",\n        \"year\": 1965,\n    }\n\n\ndef test_create_book_rejects_empty_title():\n    response = client.post(\n        \"/books\",\n        json={\"title\": \"\", \"author\": \"Nobody\", \"year\": 2000},\n    )\n    assert response.status_code == 422\n\n\ndef test_create_book_rejects_out_of_range_year():\n    response = client.post(\n        \"/books\",\n        json={\"title\": \"Time Travel\", \"author\": \"Nobody\", \"year\": 1400},\n    )\n    assert response.status_code == 422",
+            "oldText": "def test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404"
+          }
+        ],
+        "path": "test_app.py"
+      },
+      "ok": false,
+      "seconds": 0.01,
+      "result": "Could not find exact match for edit:\ndef test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404"
+    },
+    {
+      "tool": "filesystem__read_text_file",
+      "server": "filesystem",
+      "args": {
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "from fastapi.testclient import TestClient\n\nfrom app import app\n\nclient = TestClient(app)\n\n\ndef test_list_books():\n    response = client.get(\"/books\")\n    assert response.status_code == 200\n    assert len(response.json()) == 2\n\n\ndef test_get_book():\n    response = client.get(\"/books/1\")\n    assert re"
+    },
+    {
+      "tool": "filesystem__edit_file",
+      "server": "filesystem",
+      "args": {
+        "edits": [
+          {
+            "newText": "def test_get_book():\n    response = client.get(\"/books/1\")\n    assert response.status_code == 200\n    assert response.json()[\"title\"] == \"Dune\"\n\n\ndef test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404\n    assert response.json() == {\"detail\": \"Book not found\"}\n\n\ndef test_create_book_returns_201_and_next_id():\n    response = client.post(\n        \"/books\",\n        json={\"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965},\n    )\n    # ",
+            "oldText": "def test_get_book():\n    response = client.get(\"/books/1\")\n    assert response.status_code == 200\n    assert response.json()[\"title\"] == \"Dune\""
+          }
+        ],
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "```diff\nIndex: D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\n===================================================================\n--- D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\toriginal\n+++ D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\tmodified\n@@ -1"
+    },
+    {
+      "tool": "filesystem__edit_file",
+      "server": "filesystem",
+      "args": {
+        "edits": [
+          {
+            "newText": "    # ",
+            "oldText": "    # \n"
+          }
+        ],
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "```diff\nIndex: D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\n===================================================================\n--- D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\toriginal\n+++ D:\\corvus-cli\\data\\llm_runs\\groq_qwen_qwen3.8-27b\\test_app.py\tmodified\n@@ -2"
+    },
+    {
+      "tool": "filesystem__write_file",
+      "server": "filesystem",
+      "args": {
+        "content": "from fastapi.testclient import TestClient\n\nfrom app import app\n\nclient = TestClient(app)\n\n\ndef test_list_books():\n    response = client.get(\"/books\")\n    assert response.status_code == 200\n    assert len(response.json()) == 2\n\n\ndef test_get_book():\n    response = client.get(\"/books/1\")\n    assert response.status_code == 200\n    assert response.json()[\"title\"] == \"Dune\"\n\n\ndef test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404\n    assert \"",
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "Successfully wrote to test_app.py"
+    },
+    {
+      "tool": "filesystem__write_file",
+      "server": "filesystem",
+      "args": {
+        "content": "from fastapi.testclient import TestClient\n\nfrom app import app\n\nclient = TestClient(app)\n\n\ndef test_list_books():\n    response = client.get(\"/books\")\n    assert response.status_code == 200\n    assert len(response.json()) == 2\n\n\ndef test_get_book():\n    response = client.get(\"/books/1\")\n    assert response.status_code == 200\n    assert response.json()[\"title\"] == \"Dune\"\n\n\ndef test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404\n    assert \"",
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "Successfully wrote to test_app.py"
+    },
+    {
+      "tool": "filesystem__write_file",
+      "server": "filesystem",
+      "args": {
+        "content": "from fastapi.testclient import TestClient\n\nfrom app import app\n\nclient = TestClient(app)\n\n\ndef test_list_books():\n    response = client.get(\"/books\")\n    assert response.status_code == 200\n    assert len(response.json()) == 2\n\n\ndef test_get_book():\n    response = client.get(\"/books/1\")\n    assert response.status_code == 200\n    assert response.json()[\"title\"] == \"Dune\"\n\n\ndef test_get_book_not_found():\n    response = client.get(\"/books/999\")\n    assert response.status_code == 404\n    assert \"",
+        "path": "test_app.py"
+      },
+      "ok": true,
+      "seconds": 0.01,
+      "result": "Successfully wrote to test_app.py"
+    }
+  ]
+}
